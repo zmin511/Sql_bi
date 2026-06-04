@@ -28,7 +28,7 @@ SQL BI — это portable HTML-инструмент для построения
 
 ### Как использовать
 
-1. Откройте `index.html` или `sql_bi_v9.html` в браузере.
+1. Откройте `index.html` или `sql_bi_v0.1.9.html` в браузере.
 2. Загрузите файл структуры 1С в формате `.xlsx` или `.mxl`.
 3. Найдите нужный объект или поле через поиск.
 4. Отметьте поля чекбоксами.
@@ -74,7 +74,7 @@ The goal is to make 1C SQL metadata easier to work with and reduce manual lookup
 
 ### How to Use
 
-1. Open `index.html` or `sql_bi_v9.html` in a browser.
+1. Open `index.html` or `sql_bi_v0.1.9.html` in a browser.
 2. Load a 1C metadata file in `.xlsx` or `.mxl` format.
 3. Search for the required object or field.
 4. Select fields using checkboxes.
@@ -92,4 +92,4 @@ The goal is to make 1C SQL metadata easier to work with and reduce manual lookup
 
 ## Version
 
-Current published version: `v9`.
+Current published version: `0.1.9`.
