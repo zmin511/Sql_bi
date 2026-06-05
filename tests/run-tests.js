@@ -5,6 +5,7 @@ import { getDocPrefix, isVTTableName, tableFor } from "../src/core/tableDetect.j
 import { isBoolType, isDateField, isReferenceField, isReferenceType } from "../src/core/types.js";
 import { sqlDateExpr, relativeDateBoundary } from "../src/core/dates.js";
 import { castExpr } from "../src/core/casts.js";
+import { generateSql, qname } from "../src/core/sqlGenerate.js";
 
 const tests = [];
 function test(name, fn) {
@@ -87,6 +88,59 @@ test("castExpr handles UUID, bool, int, and date fields", () => {
   assert.equal(castExpr("T", "_Posted", "Булево"), "CAST(T.[_Posted] AS int)");
   assert.equal(castExpr("T", "_Number", "int"), "CAST(T.[_Number] AS int)");
   assert.equal(castExpr("T", "_Date_Time", "ДатаВремя"), "DATEADD(YEAR, -2000, T.[_Date_Time])");
+});
+
+test("qname formats optional database and schema", () => {
+  assert.equal(qname("MyDb", "dbo", "_Document100"), "[MyDb].[dbo].[_Document100]");
+  assert.equal(qname("", "dbo", "_Document100"), "[dbo].[_Document100]");
+});
+
+test("generateSql supports explicit FROM with bool and date filters", () => {
+  const rows = [
+    { id: "1", object: "Posted", title: "Posted", internal: "_Posted", type: "boolean", parentId: null },
+    { id: "2", object: "Date", title: "Date", internal: "_Date_Time", type: "datetime", parentId: null }
+  ];
+  const { sql } = generateSql({
+    rows,
+    byId: { "1": rows[0], "2": rows[1] },
+    selected: { "1": true, "2": true },
+    boolFilters: { "1": { yes: true } },
+    fromTable: "_Document100",
+    schema: "dbo",
+    periodFieldId: "2",
+    periodMonths: 1,
+    relationMode: "detail"
+  });
+
+  assert.match(sql, /FROM  \[dbo\]\.\[_Document100\] AS F/);
+  assert.match(sql, /CAST\(F\.\[_Posted\] AS int\) AS \[Posted\]/);
+  assert.match(sql, /WHERE CAST\(F\.\[_Posted\] AS int\) = 1 AND DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) >= DATEADD\(MONTH, -1, GETDATE\(\)\)/);
+  assert.match(sql, /ORDER BY DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) DESC/);
+});
+
+test("generateSql detects VT table and joins document header in flat mode", () => {
+  const rows = [
+    { id: "1", object: "Doc", internal: "_Document100", parentId: null },
+    { id: "2", object: "Number", title: "Number", internal: "_Number", type: "string", parentId: "1" },
+    { id: "3", object: "Items", internal: "_Document100_VT200", parentId: "1" },
+    { id: "4", object: "DocRef", internal: "_Document100_IDRRef", type: "uuid", parentId: "3" },
+    { id: "5", object: "Qty", title: "Qty", internal: "_Fld300", type: "int", parentId: "3" }
+  ];
+  const { byId } = buildTree(rows);
+  const result = generateSql({
+    rows,
+    byId,
+    selected: { "2": true, "5": true },
+    flatten: { "_document100_vt200": true },
+    schema: "dbo",
+    relationMode: "detail"
+  });
+
+  assert.match(result.sql, /FROM  \[dbo\]\.\[_Document100_VT200\] AS T/);
+  assert.match(result.sql, /LEFT JOIN \[dbo\]\.\[_Document100\] AS H ON T\.\[_Document100_IDRRef\] = H\.\[_IDRRef\]/);
+  assert.match(result.sql, /H\.\[_Number\] AS \[Number\]/);
+  assert.match(result.sql, /CAST\(T\.\[_Fld300\] AS int\) AS \[Qty\]/);
+  assert.ok(result.diagnostics.some(item => item.includes("JOIN header")));
 });
 
 let passed = 0;
