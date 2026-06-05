@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SQL BI 0.1.9.1</title>
+  <title>SQL BI — Portable v8 (единое дерево)</title>
   <style>
     :root {
       --bg:#0b1220;
@@ -22,10 +22,6 @@
     }
     .wrap { width:100%; padding: 14px 14px 22px; display:grid; gap:12px; box-sizing:border-box; grid-template-columns: 2fr 1fr; align-items:start; }
     .span-all { grid-column: 1 / -1; }
-    .topbar { grid-column: 1 / -1; display:flex; justify-content:flex-end; align-items:center; gap:10px; color:var(--muted); font-size:12px; }
-    .topbar b { color:var(--text); font-size:14px; }
-    .topbar a { color:#93c5fd; text-decoration:none; }
-    .topbar a:hover { text-decoration:underline; }
     .file-input{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
     @media (max-width: 1100px){ .wrap{ grid-template-columns: 1fr; } .span-all{ grid-column:auto; } }
 
@@ -43,18 +39,10 @@
     .border { border:1px solid var(--border); border-radius:10px; padding:8px; }
     .pill { font-size:11px; padding:2px 8px; border:1px solid var(--border); border-radius:999px; }
     .tree { max-height: 56vh; overflow:auto; padding:6px; text-align:left; font-size:12px; }
-    .tree .node { padding: 2px 0; display:flex; align-items:flex-start; gap:8px; border-radius:8px; }
-    .tree .node.node-vt { background: rgba(14,165,233,.055); border-left:3px solid rgba(56,189,248,.42); padding-left:6px; }
-    .tree .node.node-ref { background: rgba(34,197,94,.045); border-left:3px solid rgba(74,222,128,.34); padding-left:6px; }
-    .tree .node.node-enum { background: rgba(250,204,21,.045); border-left:3px solid rgba(250,204,21,.32); padding-left:6px; }
+    .tree .node { padding: 2px 0; display:flex; align-items:flex-start; gap:8px; }
     .tree .children { border-left:1px dashed #334155; margin-left: 12px; padding-left: 12px; }
-    .tree .children.vtshade { background: rgba(14,165,233,.035); border-color:rgba(56,189,248,.45); border-radius:10px; padding:6px 10px; margin-top:4px; }
-    .tree .children.refshade1 { background: rgba(34,197,94,.035); border-color:rgba(74,222,128,.38); border-radius:10px; padding:6px 10px; margin-top:4px; }
-    .tree .children.refshade2 { background: rgba(250,204,21,.035); border-color:rgba(250,204,21,.34); border-radius:10px; padding:6px 10px; margin-top:4px; }
-    .tag { font-size:10px; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:1px 6px; margin-right:4px; white-space:nowrap; }
-    .tag.vt { border-color:rgba(56,189,248,.45); color:#bae6fd; }
-    .tag.ref { border-color:rgba(74,222,128,.38); color:#bbf7d0; }
-    .tag.enum { border-color:rgba(250,204,21,.35); color:#fef3c7; }
+    .tree .children.refshade1 { background: rgba(255,255,255,0.02); border-radius:10px; padding:6px 10px; margin-top:4px; }
+    .tree .children.refshade2 { background: rgba(255,255,255,0.04); border-radius:10px; padding:6px 10px; margin-top:4px; }
     .xml { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace; }
     .xml b { color:#93c5fd; }
     .xml .k { color:#a7f3d0; }
@@ -72,16 +60,12 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">
-      <b>SQL BI</b>
-      <a href="https://github.com/zmin511/Sql_bi" target="_blank" rel="noopener">GitHub</a>
-      <span>v0.1.9.1</span>
-    </div>
     <div class="card">
       <h2>Структура из XLSX/MXL (единое дерево)
         <span class="row">
           <input type="file" id="xlsx" accept=".xlsx,.xls,.mxl" class="file-input"/>
           <label class="btn secondary" id="btn-load" for="xlsx">Загрузить файл</label>
+          <button class="btn ghost" id="btn-demo">Демо</button>
         </span>
       </h2>
       <div class="content">
@@ -104,6 +88,13 @@
       
       <div class="content">
         <div class="grid" style="gap:8px">
+          <label class="muted">База данных</label>
+          <input id="dbName" class="input" placeholder="MyDatabase"/>
+          <label class="muted">Схема</label>
+          <input id="schema" class="input" placeholder="dbo"/>
+          <label class="muted">FROM — таблица / представление</label>
+          <input id="fromTable" class="input" placeholder="(если пусто — определяется автоматически)"/>
+
           <label class="muted">Поле даты (для относительного периода)</label>
           <select id="periodField" class="input"></select>
 
@@ -113,16 +104,8 @@
               <input id="periodMonths" type="number" class="input" min="0" value="3"/>
             </div>
             <div style="flex:1; min-width:140px">
-              <label class="muted">За последние, дней</label>
-              <input id="periodDays" type="number" class="input" min="0" value="0"/>
-            </div>
-            <div style="flex:1; min-width:140px">
               <label class="muted">На предстоящие, мес.</label>
               <input id="periodMonthsFuture" type="number" class="input" min="0" value="0"/>
-            </div>
-            <div style="flex:1; min-width:140px">
-              <label class="muted">На предстоящие, дней</label>
-              <input id="periodDaysFuture" type="number" class="input" min="0" value="0"/>
             </div>
           </div>
 
@@ -171,7 +154,7 @@
       expanded: {},      // id -> true
       search: "",
       dbName:"", schema:"dbo", fromTable:"",
-      periodFieldId:"", periodMonths:3, periodDays:0, periodMonthsFuture:0, periodDaysFuture:0,
+      periodFieldId:"", periodMonths:3, periodMonthsFuture:0,
       refDepth:5, relationMode:"detail",
       byId:{}, children:{}, roots:[],
       metaById:{},       // для синтетических узлов
@@ -345,16 +328,6 @@
       return expr;
     }
 
-    function relativeDateBoundary(months, days, direction){
-      let expr = "GETDATE()";
-      const m = Math.max(0, Number(months||0))||0;
-      const d = Math.max(0, Number(days||0))||0;
-      const sign = direction === "future" ? 1 : -1;
-      if(m>0) expr = `DATEADD(MONTH, ${sign*m}, ${expr})`;
-      if(d>0) expr = `DATEADD(DAY, ${sign*d}, ${expr})`;
-      return expr;
-    }
-
     function tableFor(row){
       let cur=row, tableNode=null;
       while(cur){
@@ -384,15 +357,6 @@
     function isVTTableName(name){
       const s = String(name||"");
       return /^(_Document|_Reference|_Catalog|_InfoRg|_AccumRg)[0-9A-Za-z_]+_VT/i.test(s);
-    }
-
-    function nodeVisualKind(row){
-      const internal = String(row && row.internal || "");
-      const type = String(row && row.type || "").toLowerCase();
-      if(isVTTableName(internal)) return "vt";
-      if(/^_enum/i.test(internal) || type.includes("перечисление.") || type.includes("РїРµСЂРµС‡РёСЃР»РµРЅРёРµ.")) return "enum";
-      if(/^_reference/i.test(internal) || type.includes("справочник.") || type.includes("СЃРїСЂР°РІРѕС‡РЅРёРє.")) return "ref";
-      return "";
     }
 
 
@@ -498,7 +462,6 @@
       const baseTopId = rowOrMeta.baseTopId;
       const chainToThisTable = rowOrMeta.chainToThisTable || [];
       const refInternal = rowOrMeta.refInternal || (row.internal || row.object);
-      const displayPrefix = rowOrMeta.displayPrefix || row.object || row.title || row.internal || "Ссылка";
 
       if(!isReferenceType(row.type)) return [];
       if(chainToThisTable.length >= maxRefDepth()) return [];
@@ -535,15 +498,13 @@
 
       return all.map(f=>{
         const fid = synthId(baseTopId, chainLen, targetTable, String(f.internal||f.object||""));
-        const displayName = f.title || f.object || f.internal || "Поле";
-        const displayPath = `${displayPrefix}.${displayName}`;
+        const displayPath = `${row.object}.${f.internal||f.object}`;
         ensureMeta(fid, {
           baseTopId,
           chain: nextChain,
           tableInternal: targetTable,
           field: { object:f.object, title:f.title||f.object, internal:f.internal||f.object, type:f.type||"" },
-          displayPath,
-          displayPrefix: displayPath
+          displayPath
         });
         return { id: fid, object:f.object, title:f.title||f.object, internal:f.internal||f.object, type:f.type||"", __synth:true };
       });
@@ -584,11 +545,7 @@
         const open = !!state.expanded[nodeId];
         const hasKids = origKids.length>0 || hasRefKids;
 
-        const visualKind = nodeVisualKind(row);
-        const visualTitle = visualKind==="vt" ? "Табличная часть: строки этой вкладки могут стать базой плоской таблицы" :
-          visualKind==="ref" ? "Справочник: вложенные поля подтягиваются через LEFT JOIN по _IDRRef" :
-          visualKind==="enum" ? "Перечисление: вложенные поля подтягиваются как справочник/enum через LEFT JOIN" : "";
-        const div = el("div",{className:"node" + (visualKind ? " node-" + visualKind : ""), title:visualTitle});
+        const div = el("div",{className:"node"});
 
         const btn = el("button",{
           className:"btn ghost",
@@ -604,8 +561,7 @@
         });
 
         const label = el("span",{className:"node-label"});
-        const tag = visualKind ? `<span class="tag ${visualKind}">${visualKind==="vt"?"ТЧ":visualKind==="ref"?"Справочник":"Enum"}</span>` : "";
-        label.innerHTML = `${tag}&lt;<b>${HL(row.object,state.search)}</b>${row.type?` <span class="k">type</span>=<span class="v">"${HL(row.type,state.search)}"</span>`:""}${row.internal?` <span class="k">internal</span>=<span class="v">"${HL(row.internal,state.search)}"</span>`:""}&gt;` + (row.title?` <span class="muted">// ${HL(row.title,state.search)}</span>`:"");
+        label.innerHTML = `&lt;<b>${HL(row.object,state.search)}</b>${row.type?` <span class="k">type</span>=<span class="v">"${HL(row.type,state.search)}"</span>`:""}${row.internal?` <span class="k">internal</span>=<span class="v">"${HL(row.internal,state.search)}"</span>`:""}&gt;` + (row.title?` <span class="muted">// ${HL(row.title,state.search)}</span>`:"");
         label.onclick = ()=>{ cb.checked = !cb.checked; cb.dispatchEvent(new Event("change")); };
         let boolWrap = null;
         // bool filters (Да/Нет) — влияют на WHERE, если выбрано ровно одно
@@ -637,7 +593,7 @@
         if(row && isVTTableName(row.internal||"")){
           const tname = String(row.internal||"");
           const fkey = tname.toLowerCase();
-          const wrap = el("span",{className:"boolflt", title:"Плоская таблица: базой становятся строки этой табличной части. Выбранные поля шапки документа добавляются через LEFT JOIN и повторяются в каждой строке табличной части."});
+          const wrap = el("span",{className:"boolflt", title:"Плоская таблица: строки табличной части + выбранные поля шапки (повторяются)"});
           const inp = el("input",{
             type:"checkbox",
             checked: !!state.flatten[fkey],
@@ -663,7 +619,7 @@
         if(hasKids && open){
           // original children
           if(origKids.length){
-            const ch = el("div",{className:"children" + (visualKind==="vt" ? " vtshade" : "")});
+            const ch = el("div",{className:"children"});
             origKids.forEach(cid=>renderNode(cid,ch,depth+1));
             mount.appendChild(ch);
           }
@@ -671,7 +627,7 @@
           if(hasRefKids){
             const baseTopId = (nd.kind==="orig") ? nodeId : nd.meta.baseTopId;
             const refInternal = (nd.kind==="orig") ? (row.internal||row.object) : (row.internal||row.object);
-            const refKids = makeRefChildrenFor(nodeId, { row, baseTopId, chainToThisTable: chainForRef, refInternal, displayPrefix: (nd.kind==="orig") ? (row.object||row.title||row.internal) : (nd.meta.displayPrefix||nd.meta.displayPath) });
+            const refKids = makeRefChildrenFor(nodeId, { row, baseTopId, chainToThisTable: chainForRef, refInternal });
             const shadeClass = (( ( (nd.kind==="orig") ? 1 : (nd.meta.chain.length+1) ) ) % 2) ? "refshade1" : "refshade2";
             const ch2 = el("div",{className:"children "+shadeClass});
             refKids.forEach(k=>{
@@ -718,9 +674,7 @@
 
       const periodField = state.periodFieldId ? (state.byId[state.periodFieldId] || null) : null;
       const pastMonths = Math.max(0, Number(state.periodMonths||0))||0;
-      const pastDays = Math.max(0, Number(state.periodDays||0))||0;
       const futureMonths = Math.max(0, Number(state.periodMonthsFuture||0))||0;
-      const futureDays = Math.max(0, Number(state.periodDaysFuture||0))||0;
 
       // if explicit fromTable
       if(state.fromTable.trim()){
@@ -769,12 +723,12 @@
         });
 
         // period filter
-        if(periodField && (pastMonths>0 || pastDays>0 || futureMonths>0 || futureDays>0)){
+        if(periodField && (pastMonths>0 || futureMonths>0)){
           const col = periodField.internal || periodField.object;
           const isDatePF = /_Date_Time$/i.test(col) || col==="_Date_Time" || /дата/i.test(String(periodField.type||"")) || /date|datetime/i.test(String(periodField.type||"").toLowerCase());
           const dateExpr = isDatePF ? `DATEADD(YEAR, -2000, ${A}.[${col}])` : `${A}.[${col}]`;
-          if(pastMonths>0 || pastDays>0) wheres.push(`${dateExpr} >= ${relativeDateBoundary(pastMonths, pastDays, "past")}`);
-          if(futureMonths>0 || futureDays>0) wheres.push(`${dateExpr} <= ${relativeDateBoundary(futureMonths, futureDays, "future")}`);
+          if(pastMonths>0) wheres.push(`${dateExpr} >= DATEADD(MONTH, -${pastMonths}, GETDATE())`);
+          if(futureMonths>0) wheres.push(`${dateExpr} <= DATEADD(MONTH, ${futureMonths}, GETDATE())`);
           orderBy = `${dateExpr} DESC`;
         }
 const lines = [
@@ -911,15 +865,15 @@ const lines = [
         joinLines.forEach(j=>lines.push(j));
         // period filter only if the period field belongs to this part
         const df = periodField;
-        if(df && (pastMonths>0 || pastDays>0 || futureMonths>0 || futureDays>0)){
+        if(df && (pastMonths>0 || futureMonths>0)){
           const tdf = tableFor(df); const tnameDf = String((tdf && (tdf.internal||tdf.object))||"");
           const srcDF = (header && tnameDf===header) ? H : T;
           const col = df.internal||df.object;
           const isDateDF = /_Date_Time$/i.test(col) || col==="_Date_Time" || /дата/i.test(String(df.type||"")) || /date|datetime/i.test(String(df.type||"").toLowerCase());
           const dateExpr = isDateDF ? `DATEADD(YEAR, -2000, ${srcDF}.[${col}])` : `${srcDF}.[${col}]`;
           if(tnameDf===baseTable || (header && tnameDf===header)){
-            if(pastMonths>0 || pastDays>0) wheres.push(`${dateExpr} >= ${relativeDateBoundary(pastMonths, pastDays, "past")}`);
-            if(futureMonths>0 || futureDays>0) wheres.push(`${dateExpr} <= ${relativeDateBoundary(futureMonths, futureDays, "future")}`);
+            if(pastMonths>0) wheres.push(`${dateExpr} >= DATEADD(MONTH, -${pastMonths}, GETDATE())`);
+            if(futureMonths>0) wheres.push(`${dateExpr} <= DATEADD(MONTH, ${futureMonths}, GETDATE())`);
             orderBy = `${dateExpr} DESC`;
           }
         }
@@ -1027,14 +981,12 @@ const lines = [
     };
     $("btn-collapse").onclick = ()=>{ state.expanded={}; renderTree(); };
 
-    if($("dbName")) $("dbName").oninput = (e)=>{ state.dbName=e.target.value; renderSQL(); };
-    if($("schema")) $("schema").oninput = (e)=>{ state.schema=e.target.value; renderSQL(); };
-    if($("fromTable")) $("fromTable").oninput = (e)=>{ state.fromTable=e.target.value; renderSQL(); };
+    $("dbName").oninput = (e)=>{ state.dbName=e.target.value; renderSQL(); };
+    $("schema").oninput = (e)=>{ state.schema=e.target.value; renderSQL(); };
+    $("fromTable").oninput = (e)=>{ state.fromTable=e.target.value; renderSQL(); };
     $("periodMonths").oninput = (e)=>{ state.periodMonths = Math.max(0, Number(e.target.value||0)); renderSQL(); };
-    $("periodDays").oninput = (e)=>{ state.periodDays = Math.max(0, Number(e.target.value||0)); renderSQL(); };
 
     $("periodMonthsFuture").oninput = (e)=>{ state.periodMonthsFuture = Math.max(0, Number(e.target.value||0)); renderSQL(); };
-    $("periodDaysFuture").oninput = (e)=>{ state.periodDaysFuture = Math.max(0, Number(e.target.value||0)); renderSQL(); };
     $("refDepth").oninput = (e)=>{
       state.refDepth = Math.max(1, Math.min(5, Number(e.target.value||5)));
       e.target.value = state.refDepth;
@@ -1053,8 +1005,7 @@ const lines = [
       setTimeout(()=>$("btn-copy").textContent="Копировать", 1200);
     };
 
-    const demoBtn = $("btn-demo");
-    if(demoBtn) demoBtn.onclick = ()=>{
+    $("btn-demo").onclick = ()=>{
       const demo=[
         { id:"1", object:"Документы", title:"Документы", internal:"", parentId:null, level:0 },
         { id:"2", object:"Заявка", title:"Документ.Заявка", internal:"_Document283", parentId:"1", level:1 },

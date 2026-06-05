@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SQL BI 0.1.9.1</title>
+  <title>SQL BI — Portable v8 (единое дерево)</title>
   <style>
     :root {
       --bg:#0b1220;
@@ -22,10 +22,6 @@
     }
     .wrap { width:100%; padding: 14px 14px 22px; display:grid; gap:12px; box-sizing:border-box; grid-template-columns: 2fr 1fr; align-items:start; }
     .span-all { grid-column: 1 / -1; }
-    .topbar { grid-column: 1 / -1; display:flex; justify-content:flex-end; align-items:center; gap:10px; color:var(--muted); font-size:12px; }
-    .topbar b { color:var(--text); font-size:14px; }
-    .topbar a { color:#93c5fd; text-decoration:none; }
-    .topbar a:hover { text-decoration:underline; }
     .file-input{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
     @media (max-width: 1100px){ .wrap{ grid-template-columns: 1fr; } .span-all{ grid-column:auto; } }
 
@@ -72,11 +68,6 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">
-      <b>SQL BI</b>
-      <a href="https://github.com/zmin511/Sql_bi" target="_blank" rel="noopener">GitHub</a>
-      <span>v0.1.9.1</span>
-    </div>
     <div class="card">
       <h2>Структура из XLSX/MXL (единое дерево)
         <span class="row">
@@ -104,6 +95,13 @@
       
       <div class="content">
         <div class="grid" style="gap:8px">
+          <label class="muted">База данных</label>
+          <input id="dbName" class="input" placeholder="MyDatabase"/>
+          <label class="muted">Схема</label>
+          <input id="schema" class="input" placeholder="dbo"/>
+          <label class="muted">FROM — таблица / представление</label>
+          <input id="fromTable" class="input" placeholder="(если пусто — определяется автоматически)"/>
+
           <label class="muted">Поле даты (для относительного периода)</label>
           <select id="periodField" class="input"></select>
 
@@ -498,7 +496,6 @@
       const baseTopId = rowOrMeta.baseTopId;
       const chainToThisTable = rowOrMeta.chainToThisTable || [];
       const refInternal = rowOrMeta.refInternal || (row.internal || row.object);
-      const displayPrefix = rowOrMeta.displayPrefix || row.object || row.title || row.internal || "Ссылка";
 
       if(!isReferenceType(row.type)) return [];
       if(chainToThisTable.length >= maxRefDepth()) return [];
@@ -535,15 +532,13 @@
 
       return all.map(f=>{
         const fid = synthId(baseTopId, chainLen, targetTable, String(f.internal||f.object||""));
-        const displayName = f.title || f.object || f.internal || "Поле";
-        const displayPath = `${displayPrefix}.${displayName}`;
+        const displayPath = `${row.object}.${f.internal||f.object}`;
         ensureMeta(fid, {
           baseTopId,
           chain: nextChain,
           tableInternal: targetTable,
           field: { object:f.object, title:f.title||f.object, internal:f.internal||f.object, type:f.type||"" },
-          displayPath,
-          displayPrefix: displayPath
+          displayPath
         });
         return { id: fid, object:f.object, title:f.title||f.object, internal:f.internal||f.object, type:f.type||"", __synth:true };
       });
@@ -671,7 +666,7 @@
           if(hasRefKids){
             const baseTopId = (nd.kind==="orig") ? nodeId : nd.meta.baseTopId;
             const refInternal = (nd.kind==="orig") ? (row.internal||row.object) : (row.internal||row.object);
-            const refKids = makeRefChildrenFor(nodeId, { row, baseTopId, chainToThisTable: chainForRef, refInternal, displayPrefix: (nd.kind==="orig") ? (row.object||row.title||row.internal) : (nd.meta.displayPrefix||nd.meta.displayPath) });
+            const refKids = makeRefChildrenFor(nodeId, { row, baseTopId, chainToThisTable: chainForRef, refInternal });
             const shadeClass = (( ( (nd.kind==="orig") ? 1 : (nd.meta.chain.length+1) ) ) % 2) ? "refshade1" : "refshade2";
             const ch2 = el("div",{className:"children "+shadeClass});
             refKids.forEach(k=>{
@@ -1027,9 +1022,9 @@ const lines = [
     };
     $("btn-collapse").onclick = ()=>{ state.expanded={}; renderTree(); };
 
-    if($("dbName")) $("dbName").oninput = (e)=>{ state.dbName=e.target.value; renderSQL(); };
-    if($("schema")) $("schema").oninput = (e)=>{ state.schema=e.target.value; renderSQL(); };
-    if($("fromTable")) $("fromTable").oninput = (e)=>{ state.fromTable=e.target.value; renderSQL(); };
+    $("dbName").oninput = (e)=>{ state.dbName=e.target.value; renderSQL(); };
+    $("schema").oninput = (e)=>{ state.schema=e.target.value; renderSQL(); };
+    $("fromTable").oninput = (e)=>{ state.fromTable=e.target.value; renderSQL(); };
     $("periodMonths").oninput = (e)=>{ state.periodMonths = Math.max(0, Number(e.target.value||0)); renderSQL(); };
     $("periodDays").oninput = (e)=>{ state.periodDays = Math.max(0, Number(e.target.value||0)); renderSQL(); };
 

@@ -28,8 +28,7 @@ SQL BI — portable HTML-инструмент для визуального по
 
 Откройте в браузере:
 
-- `index.html` — текущая опубликованная версия;
-- `sql_bi_v0.1.9.html` — стабильная версия 0.1.9.
+- `index.html` — единственный рабочий файл приложения в корне проекта.
 
 Установка не требуется. Приложение работает как один HTML-файл.
 
@@ -113,7 +112,7 @@ DATEADD(YEAR, -2000, T.[_Date_Time])
 
 Если выбранные связи могут размножить строки, приложение должно показывать предупреждение в диагностике. Агрегация через `STRING_AGG` планируется как отдельный явный режим, но не должна включаться автоматически.
 
-## Ограничения версии 0.1.9
+## Ограничения версии 0.1.9.1
 
 - Проект пока остается single-file HTML/JS.
 - Бизнес-логика SQL-генератора пока смешана с UI.
@@ -125,7 +124,7 @@ DATEADD(YEAR, -2000, T.[_Date_Time])
 
 ## Версионирование и откат
 
-Текущая стабильная версия: `0.1.9`.
+Текущая стабильная версия: `0.1.9.1`.
 
 Правила версий:
 
@@ -137,7 +136,7 @@ DATEADD(YEAR, -2000, T.[_Date_Time])
 Перед изменениями нужно:
 
 1. Создать backup текущего рабочего файла.
-2. Не перезаписывать стабильную версию.
+2. Не хранить версионные копии HTML в корне проекта.
 3. Обновить номер версии в интерфейсе.
 4. Обновить `CHANGELOG.md`.
 5. Зафиксировать, что изменено и что проверено.
@@ -146,7 +145,11 @@ DATEADD(YEAR, -2000, T.[_Date_Time])
 
 ```text
 backups/sql_bi_v0.1.9_2026-06-05_baseline.html
+backups/sql_bi_v0.1.9_release.html
+backups/sql_bi_v0.2.0-dev_seed.html
 ```
+
+В корне репозитория должен оставаться один рабочий HTML-файл: `index.html`. Исторические и промежуточные HTML-копии нужно складывать в `backups/`.
 
 ## История версий
 
@@ -203,15 +206,14 @@ The main goal is to make technical 1C names such as `_Document...`, `_Reference.
 
 Open in a browser:
 
-- `index.html` — current published version;
-- `sql_bi_v0.1.9.html` — stable version 0.1.9.
+- `index.html` — the single working application file in the project root.
 
 No installation is required. The application is a single HTML file.
 
 ## Current Version
 
-Stable version: `0.1.9`.
+Stable version: `0.1.9.1`.
 
-Development copy: `sql_bi_v0.2.0-dev.html`.
+Historical and development HTML copies are stored in `backups/`.
 
 See `CHANGELOG.md` for version history.

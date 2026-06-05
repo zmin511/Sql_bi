@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.9.1 — 2026-06-05
+
+### Изменено
+- В корне проекта оставлен один рабочий HTML-файл: `index.html`.
+- Версия в интерфейсе и `VERSION` обновлена до `0.1.9.1`.
+- Старые и промежуточные HTML-копии перенесены в `backups/`.
+- README обновлен под правило: версии фиксируются в интерфейсе, `VERSION`, `CHANGELOG.md`, git history и backup-файлах, а не отдельными HTML-файлами в корне.
+
+### Перенесено в backups
+- `sql_bi_v9.html` -> `backups/sql_bi_v9_legacy.html`
+- `sql_bi_v0.1.9.html` -> `backups/sql_bi_v0.1.9_release.html`
+- `sql_bi_v0.2.0-dev.html` -> `backups/sql_bi_v0.2.0-dev_seed.html`
+
+### Проверено
+- JavaScript в `index.html` компилируется.
+
+### Риски
+- Логика SQL-генерации не менялась.
+
+### Откат
+- Вернуть нужную HTML-копию из `backups/` в `index.html`.
+
 ## 0.1.9 — 2026-06-05
 
 ### Добавлено
