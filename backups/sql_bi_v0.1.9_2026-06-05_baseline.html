@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SQL BI 0.1.9</title>
+  <style>
+    :root {
+      --bg:#0b1220;
+      --panel:#111827;
+      --panel2:#0f172a;
+      --panel3:#111d33;
+      --text:#e5e7eb;
+      --muted:#9aa3b2;
+      --border:#1f2937;
+      --accent:#60a5fa;
+      --hl:#fde68a;
+    }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+      font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      font-size: 13px;
+    }
+    .wrap { width:100%; padding: 14px 14px 22px; display:grid; gap:12px; box-sizing:border-box; grid-template-columns: 2fr 1fr; align-items:start; }
+    .span-all { grid-column: 1 / -1; }
+    .topbar { grid-column: 1 / -1; display:flex; justify-content:flex-end; align-items:center; gap:10px; color:var(--muted); font-size:12px; }
+    .topbar b { color:var(--text); font-size:14px; }
+    .topbar a { color:#93c5fd; text-decoration:none; }
+    .topbar a:hover { text-decoration:underline; }
+    .file-input{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
+    @media (max-width: 1100px){ .wrap{ grid-template-columns: 1fr; } .span-all{ grid-column:auto; } }
+
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+    .card h2 { margin:0; padding:12px 14px; border-bottom:1px solid var(--border); font-size:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .content { padding: 12px 14px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .grid { display:grid; gap:10px; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .btn { background:#0ea5e9; color:white; border:none; border-radius:10px; padding:6px 10px; font-weight:600; cursor:pointer; font-size:12px; }
+    .btn.secondary { background:#374151; }
+    .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
+    .input, select, textarea { background:#0b1220; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:6px 8px; font-size:12px; }
+    textarea { width:100%; height:330px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace; font-size:12px; }
+    .border { border:1px solid var(--border); border-radius:10px; padding:8px; }
+    .pill { font-size:11px; padding:2px 8px; border:1px solid var(--border); border-radius:999px; }
+    .tree { max-height: 56vh; overflow:auto; padding:6px; text-align:left; font-size:12px; }
+    .tree .node { padding: 2px 0; display:flex; align-items:flex-start; gap:8px; border-radius:8px; }
+    .tree .node.node-vt { background: rgba(14,165,233,.055); border-left:3px solid rgba(56,189,248,.42); padding-left:6px; }
+    .tree .node.node-ref { background: rgba(34,197,94,.045); border-left:3px solid rgba(74,222,128,.34); padding-left:6px; }
+    .tree .node.node-enum { background: rgba(250,204,21,.045); border-left:3px solid rgba(250,204,21,.32); padding-left:6px; }
+    .tree .children { border-left:1px dashed #334155; margin-left: 12px; padding-left: 12px; }
+    .tree .children.vtshade { background: rgba(14,165,233,.035); border-color:rgba(56,189,248,.45); border-radius:10px; padding:6px 10px; margin-top:4px; }
+    .tree .children.refshade1 { background: rgba(34,197,94,.035); border-color:rgba(74,222,128,.38); border-radius:10px; padding:6px 10px; margin-top:4px; }
+    .tree .children.refshade2 { background: rgba(250,204,21,.035); border-color:rgba(250,204,21,.34); border-radius:10px; padding:6px 10px; margin-top:4px; }
+    .tag { font-size:10px; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:1px 6px; margin-right:4px; white-space:nowrap; }
+    .tag.vt { border-color:rgba(56,189,248,.45); color:#bae6fd; }
+    .tag.ref { border-color:rgba(74,222,128,.38); color:#bbf7d0; }
+    .tag.enum { border-color:rgba(250,204,21,.35); color:#fef3c7; }
+    .xml { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace; }
+    .xml b { color:#93c5fd; }
+    .xml .k { color:#a7f3d0; }
+    .xml .v { color:#fca5a5; }
+    .hl { background: var(--hl); color: #111827; padding: 0 2px; border-radius: 4px; }
+    .node-label { cursor:pointer; display:inline-block; line-height:1.35; user-select:none; }
+
+    .boolflt{display:inline-flex; align-items:center; gap:6px; margin:0 8px 0 0; font-size:12px; opacity:.95}
+    .boolflt label{ display:inline-flex; gap:4px; align-items:center; font-size:12px; color:var(--muted); cursor:pointer; user-select:none; }
+    .boolflt input{ width:14px; height:14px; accent-color: var(--accent); }
+    .muted { color: var(--muted); }
+    .warn { background:#2a1616; border:1px solid #7f1d1d; padding:8px 10px; border-radius:10px; color:#fecaca; font-size:12px; margin-top:8px; }
+    .tiny { font-size:11px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <b>SQL BI</b>
+      <a href="https://github.com/zmin511/Sql_bi" target="_blank" rel="noopener">GitHub</a>
+      <span>v0.1.9</span>
+    </div>
+    <div class="card">
+      <h2>Структура из XLSX/MXL (единое дерево)
+        <span class="row">
+          <input type="file" id="xlsx" accept=".xlsx,.xls,.mxl" class="file-input"/>
+          <label class="btn secondary" id="btn-load" for="xlsx">Загрузить файл</label>
+        </span>
+      </h2>
+      <div class="content">
+        <div class="row" style="margin-bottom:10px">
+          <input id="search" class="input" placeholder="Поиск по объектам/типам/внутр. именам…" style="flex:1; min-width:260px"/>
+          <button class="btn secondary" id="btn-expand">+ всё</button>
+          <button class="btn secondary" id="btn-collapse">− всё</button>
+          <button class="btn ghost" id="btn-clear">Очистить</button>
+          <span class="pill muted">Выбрано: <span id="selCount">0</span></span>
+          <span class="pill muted">Ссылок: <span id="refCount">0</span></span>
+        </div>
+        <div class="muted tiny" style="margin-bottom:8px">
+          Логика: галочка на поле-ссылке — выводит GUID. Плюсик раскрывает поля справочника/перечисления прямо в дереве; можно углубляться дальше.
+        </div>
+        <div id="tree" class="tree border xml"></div>
+      </div>
+    </div>
+<div class="card">
+      <h2>Настройки запроса</h2>
+      
+      <div class="content">
+        <div class="grid" style="gap:8px">
+          <label class="muted">Поле даты (для относительного периода)</label>
+          <select id="periodField" class="input"></select>
+
+          <div class="row" style="gap:10px; align-items:flex-end">
+            <div style="flex:1; min-width:140px">
+              <label class="muted">За последние, мес.</label>
+              <input id="periodMonths" type="number" class="input" min="0" value="3"/>
+            </div>
+            <div style="flex:1; min-width:140px">
+              <label class="muted">За последние, дней</label>
+              <input id="periodDays" type="number" class="input" min="0" value="0"/>
+            </div>
+            <div style="flex:1; min-width:140px">
+              <label class="muted">На предстоящие, мес.</label>
+              <input id="periodMonthsFuture" type="number" class="input" min="0" value="0"/>
+            </div>
+            <div style="flex:1; min-width:140px">
+              <label class="muted">На предстоящие, дней</label>
+              <input id="periodDaysFuture" type="number" class="input" min="0" value="0"/>
+            </div>
+          </div>
+
+          <div class="row" style="gap:10px; align-items:flex-end">
+            <div style="flex:1; min-width:140px">
+              <label class="muted">Глубина справочников</label>
+              <input id="refDepth" type="number" class="input" min="1" max="5" value="5"/>
+            </div>
+            <div style="flex:2; min-width:220px">
+              <label class="muted">Режим связей 1:N</label>
+              <select id="relationMode" class="input">
+                <option value="detail">Сохранять строки</option>
+                <option value="warn">Только предупреждать</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div>
+
+
+    <div class="card span-all">
+      <h2>Результат: SQL
+        <span class="row">
+          <button class="btn ghost" id="btn-copy">Копировать</button>
+        </span>
+      </h2>
+      <div class="content">
+        <textarea id="sql" readonly>-- Загрузите структуру и отметьте поля слева</textarea>
+        <div class="warn" id="sqlHint" style="display:none"></div>
+        <div class="border tiny" id="diag" style="display:none; margin-top:8px; white-space:pre-wrap"></div>
+      </div>
+    </div>
+
+    
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+  (function(){
+    const state = {
+      rows: [],
+      selected: {},      // id -> true
+      expanded: {},      // id -> true
+      search: "",
+      dbName:"", schema:"dbo", fromTable:"",
+      periodFieldId:"", periodMonths:3, periodDays:0, periodMonthsFuture:0, periodDaysFuture:0,
+      refDepth:5, relationMode:"detail",
+      byId:{}, children:{}, roots:[],
+      metaById:{},       // для синтетических узлов
+      boolFilters:{}    // id -> {yes,no}
+    ,flatten:{}    // tableName -> true (режим "Плоская" для _VT)
+    };
+
+    const $ = (id)=>document.getElementById(id);
+    const el = (tag, props={}, ...children) => {
+      const d=document.createElement(tag);
+      Object.assign(d, props);
+      children.forEach(c=>d.appendChild(typeof c==="string"?document.createTextNode(c):c));
+      return d;
+    };
+    const escapeHtml = (s)=> String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const HL = (text,q)=> !q?escapeHtml(text):escapeHtml(text).replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"ig"),m=>'<span class="hl">'+m+'</span>');
+
+    function normalizeHeader(header){
+      const h = String(header||"").trim().toLowerCase();
+      const map = {
+        "объекты":"object","объект":"object","object":"object","name":"object","название":"object",
+        "заголовок":"title","наименование":"title","title":"title",
+        "тип":"type","type":"type",
+        "внутреннее имя":"internal","внутреннееимя":"internal","internalname":"internal","internal":"internal",
+        "код":"internal","code":"internal",
+        "parent":"parentId","родитель":"parentId","parentid":"parentId",
+        "уровень":"level","level":"level","id":"id"
+      };
+      return map[h] || h;
+    }
+
+    function buildTree(rows){
+      const byId = {}; rows.forEach(r=>byId[r.id]=r);
+      const children = {}; const roots = [];
+      rows.forEach(r=>{
+        const p = r.parentId && byId[r.parentId] ? r.parentId : null;
+        if(!p) roots.push(r);
+        else (children[p]=children[p]||[]).push(r);
+      });
+      const sorter=(a,b)=>(a.level||0)-(b.level||0) || String(a.object).localeCompare(String(b.object));
+      roots.sort(sorter); Object.values(children).forEach(arr=>arr.sort(sorter));
+      return {byId, children, roots};
+    }
+
+    function importRows(rows){
+      const hasLevels = rows.some(r => r.level !== undefined);
+      const hasAnyParent = rows.some(r => r.parentId);
+      if(hasLevels && !hasAnyParent){
+        const stack=[];
+        rows.forEach(r=>{
+          const lvl = r.level || 0;
+          while(stack.length && (stack[stack.length-1].level||0) >= lvl) stack.pop();
+          r.parentId = stack.length ? stack[stack.length-1].id : null;
+          stack.push(r);
+        });
+      }
+
+      state.rows = rows;
+      const built = buildTree(rows);
+      state.byId=built.byId; state.children=built.children; state.roots=built.roots;
+      state.selected={}; state.expanded={}; state.metaById={}; state.boolFilters={};
+      renderTree(); renderSQL();
+    }
+
+    function rowsFromTableObjects(json){
+      return json.map((row, idx) => {
+        const norm={}; Object.entries(row).forEach(([k,v])=> norm[normalizeHeader(String(k))]=v);
+        const id = String(norm.id || idx+1);
+        return {
+          id,
+          object: String(norm.object || norm.title || norm.internal || ("Поле " + (idx+1))),
+          type: norm.type ? String(norm.type) : undefined,
+          internal: norm.internal ? String(norm.internal) : undefined,
+          title: norm.title ? String(norm.title) : undefined,
+          parentId: norm.parentId ? String(norm.parentId) : null,
+          level: (norm.level!==undefined && norm.level!=="") ? Number(norm.level) : undefined
+        };
+      });
+    }
+
+    function decodeMxlText(buf){
+      const bytes = new Uint8Array(buf);
+      let start = 0;
+      for(let i=0; i<bytes.length-2; i++){
+        if(bytes[i]===0xEF && bytes[i+1]===0xBB && bytes[i+2]===0xBF){ start = i + 3; break; }
+      }
+      return new TextDecoder("utf-8").decode(bytes.slice(start));
+    }
+
+    function rowsFromMxlBuffer(buf){
+      const text = decodeMxlText(buf);
+      const bytes = new Uint8Array(buf);
+      const signature = String.fromCharCode(bytes[0]||0, bytes[1]||0, bytes[2]||0, bytes[3]||0, bytes[4]||0, bytes[5]||0);
+      if(signature !== "MOXCEL"){
+        throw new Error("Файл не похож на MXL: не найден заголовок MOXCEL");
+      }
+      const headers = ["Объекты","Тип","Список типов","Уровень","Полное имя","Номер картинки","Метаданные","Внутреннее имя"];
+      const cells = [];
+      const re = /\{16,\d+,\s*\{1,(?:1,\s*\{"#","((?:[^"\\]|\\.)*)"\}|0)\s*\},0\}/g;
+      let m;
+      while((m = re.exec(text))){
+        cells.push((m[1] || "").replace(/\\"/g, '"').replace(/\\\\/g, "\\"));
+      }
+
+      const table = [];
+      for(let i=0; i<=cells.length-headers.length; i+=headers.length){
+        table.push(cells.slice(i, i+headers.length));
+      }
+
+      const headerIndex = table.findIndex(row => headers.every((h,j)=>row[j]===h));
+      if(headerIndex < 0) throw new Error("В MXL не найдена строка заголовков структуры");
+
+      const json = table.slice(headerIndex+1).map(row => {
+        const rec = {};
+        headers.forEach((h,j)=> rec[h] = row[j] || "");
+        return rec;
+      }).filter(rec => rec["Объекты"] || rec["Внутреннее имя"] || rec["Полное имя"]);
+
+      if(!json.length){
+        throw new Error("В MXL не найдены строки структуры после заголовков");
+      }
+      return rowsFromTableObjects(json);
+    }
+
+    function isReferenceType(typeStr){
+      const t = String(typeStr||"").toLowerCase();
+      return t.includes("справочник.") || t.includes("перечисление.");
+    }
+    function isReferenceField(row){
+      const internal = String(row.internal||"");
+      return isReferenceType(row.type) || /rref$/i.test(internal) || /_idrref$/i.test(internal);
+    }
+    function isRootRefTable(row){
+      const internal = String(row.internal||"");
+      return /^_reference/i.test(internal) || /^_enum/i.test(internal);
+    }
+    function isBoolType(typeStr){
+      const t = String(typeStr||"").toLowerCase();
+      return /bool|boolean|bit/.test(t) || t.includes("булев") || t.includes("логич");
+    }
+
+    function boolFilterValueForId(id){
+      const bf = state.boolFilters[id];
+      if(!bf) return null;
+      const yes = !!bf.yes, no = !!bf.no;
+      if(yes && !no) return 1;
+      if(no && !yes) return 0;
+      return null;
+    }
+
+    function isDateField(row){
+      const s = `${row.object} ${row.title||""} ${row.type||""} ${row.internal||""}`.toLowerCase();
+      return s.includes("дата") || s.includes("date") || (row.internal||"").toLowerCase()==="_date_time";
+    }
+
+    function qname(db,schema,table){
+      const dbp = db? "["+db+"]." : "";
+      const sch = schema? "["+schema+"]." : "";
+      return dbp + sch + "["+table+"]";
+    }
+
+    function castExpr(qual, col, type){
+      const expr = qual ? (qual+".["+col+"]") : ("["+col+"]");
+      const t = String(type||"").toLowerCase();
+      const isDate = /_Date_Time$/i.test(col) || col === "_Date_Time" || /дата/.test(t) || /date|datetime/.test(t);
+      if(isDate) return `DATEADD(YEAR, -2000, ${expr})`;
+      const forceUuid = /RRef$/i.test(col) || /_IDRRef$/i.test(col);
+      if(forceUuid) return `CAST(${expr} AS uniqueidentifier)`;
+      if(isBoolType(t)) return `CAST(${expr} AS int)`;
+      if(/int|number|numeric/.test(t)) return `CAST(${expr} AS int)`;
+      return expr;
+    }
+
+    function relativeDateBoundary(months, days, direction){
+      let expr = "GETDATE()";
+      const m = Math.max(0, Number(months||0))||0;
+      const d = Math.max(0, Number(days||0))||0;
+      const sign = direction === "future" ? 1 : -1;
+      if(m>0) expr = `DATEADD(MONTH, ${sign*m}, ${expr})`;
+      if(d>0) expr = `DATEADD(DAY, ${sign*d}, ${expr})`;
+      return expr;
+    }
+
+    function tableFor(row){
+      let cur=row, tableNode=null;
+      while(cur){
+        const name = String(cur.internal || cur.object || "");
+        if(/^_Document[0-9A-Za-z_]+_VT/i.test(name)) tableNode=cur;
+        else if(!tableNode && /^(_Document[0-9A-Za-z_]+|_Reference[0-9A-Za-z_]+|_Catalog[0-9A-Za-z_]+|_InfoRg[0-9A-Za-z_]+|_AccumRg[0-9A-Za-z_]+|_Enum[0-9A-Za-z_]+)/i.test(name)) tableNode=cur;
+        if(!cur.parentId) break;
+        cur = state.byId[cur.parentId];
+      }
+      return tableNode;
+    }
+    function getDocPrefix(tableName){
+      if(!tableName) return null;
+      const s = String(tableName);
+
+      // Если это табличная часть (_..._VTxxxx), то префикс — это "шапка" до _VT
+      const vtPos = s.toUpperCase().indexOf("_VT");
+      let base = vtPos>0 ? s.slice(0, vtPos) : s;
+
+      // Часто у таблиц встречается суффикс вида X1/X2/... (например _Document275X1) — убираем его
+      base = base.replace(/X\d+$/i, "");
+
+      // Берём корневое имя таблицы (шапку/корень регистра/справочника/документа)
+      const m = base.match(/^(_Document[0-9A-Za-z_]+|_Reference[0-9A-Za-z_]+|_Catalog[0-9A-Za-z_]+|_InfoRg[0-9A-Za-z_]+|_AccumRg[0-9A-Za-z_]+|_Enum[0-9A-Za-z_]+)/i);
+      return m ? m[1] : null;
+    }
+    function isVTTableName(name){
+      const s = String(name||"");
+      return /^(_Document|_Reference|_Catalog|_InfoRg|_AccumRg)[0-9A-Za-z_]+_VT/i.test(s);
+    }
+
+    function nodeVisualKind(row){
+      const internal = String(row && row.internal || "");
+      const type = String(row && row.type || "").toLowerCase();
+      if(isVTTableName(internal)) return "vt";
+      if(/^_enum/i.test(internal) || type.includes("перечисление.") || type.includes("РїРµСЂРµС‡РёСЃР»РµРЅРёРµ.")) return "enum";
+      if(/^_reference/i.test(internal) || type.includes("справочник.") || type.includes("СЃРїСЂР°РІРѕС‡РЅРёРє.")) return "ref";
+      return "";
+    }
+
+
+    function rootsByMask(maskRe){
+      return state.rows.filter(x => maskRe.test(String(x.internal||"")) );
+    }
+
+    function findTargetRoot(row){
+      const type = String(row.type||"").trim();
+      const t = type.toLowerCase();
+      const isEnum = t.includes("перечисление.");
+      const isRef  = t.includes("справочник.");
+      const roots = isEnum ? rootsByMask(/^_enum[0-9a-z_]+(x\d+)?$/i) : rootsByMask(/^_reference[0-9a-z_]+(x\d+)?$/i);
+      if(roots.length===0) return null;
+
+      const short = (type.split(".")[1]||"").trim(); // после "Справочник." / "Перечисление."
+
+      // 1) точное совпадение type
+      if(type){
+        const exactType = roots.filter(x => String(x.type||"").toLowerCase() === t);
+        if(exactType.length===1) return exactType[0];
+        if(exactType.length>1){
+          const exactObj = exactType.filter(x => String(x.object||"").toLowerCase() === short.toLowerCase());
+          if(exactObj.length) return exactObj[0];
+          return exactType[0];
+        }
+      }
+
+      if(short){
+        // 2) object = короткому имени
+        const byObject = roots.filter(x => String(x.object||"").toLowerCase() === short.toLowerCase());
+        if(byObject.length) return byObject[0];
+
+        // 3) title заканчивается на "(<type>)"
+        const byTitle = roots.filter(x => String(x.title||"").toLowerCase().endsWith(`(${t})`));
+        if(byTitle.length) return byTitle[0];
+
+        // 4) короткое имя как слово в object
+        const word = new RegExp(`(^|\\b)${short}(\\b|$)`,"i");
+        const byWord = roots.filter(x => word.test(String(x.object||"")));
+        if(byWord.length) return byWord[0];
+      }
+
+      // 5) если один — он
+      if(roots.length===1) return roots[0];
+      return roots[0];
+    }
+
+    function referenceFields(root){
+      if(!root) return [];
+      return state.rows.filter(x=>x.parentId===root.id);
+    }
+
+    function maxRefDepth(){
+      const n = Math.max(1, Math.min(5, Number(state.refDepth||5)));
+      return Number.isFinite(n) ? n : 5;
+    }
+
+    function chainHasTarget(chain, targetTable){
+      const t = String(targetTable||"").toLowerCase();
+      return (chain||[]).some(step => String(step.targetTable||"").toLowerCase() === t);
+    }
+
+    function chainText(chain){
+      return (chain||[]).map(step => `${step.refInternal} -> ${step.targetTable}`).join(" / ");
+    }
+
+    function renderDiagnostics(items){
+      const host = $("diag");
+      const list = Array.from(new Set((items||[]).filter(Boolean)));
+      if(!list.length){
+        host.style.display = "none";
+        host.textContent = "";
+        return;
+      }
+      host.style.display = "block";
+      host.textContent = "Диагностика связей:\n" + list.map(x=>"• "+x).join("\n");
+    }
+
+    function synthId(baseTopId, chainLen, tableInternal, fieldInternal){
+      return `s:${baseTopId}:${chainLen}:${tableInternal}:${fieldInternal}`;
+    }
+    function ensureMeta(id, meta){
+      if(!state.metaById[id]) state.metaById[id] = meta;
+      return state.metaById[id];
+    }
+    function isSynth(id){ return !!state.metaById[id]; }
+
+    function nodeData(id){
+      if(state.byId[id]) return { kind:"orig", row: state.byId[id] };
+      if(state.metaById[id]) return { kind:"synth", meta: state.metaById[id], row: state.metaById[id].field };
+      return null;
+    }
+
+    function nodeMatches(row, q){
+      if(!q) return true;
+      return [row.object,row.title,row.internal,row.type].filter(Boolean).some(x=>String(x).toLowerCase().includes(q));
+    }
+
+    function makeRefChildrenFor(nodeId, rowOrMeta){
+      // rowOrMeta: {row, baseTopId, chainToThisTable, refInternal}
+      const row = rowOrMeta.row;
+      const baseTopId = rowOrMeta.baseTopId;
+      const chainToThisTable = rowOrMeta.chainToThisTable || [];
+      const refInternal = rowOrMeta.refInternal || (row.internal || row.object);
+      const displayPrefix = rowOrMeta.displayPrefix || row.object || row.title || row.internal || "Ссылка";
+
+      if(!isReferenceType(row.type)) return [];
+      if(chainToThisTable.length >= maxRefDepth()) return [];
+      const root = findTargetRoot(row);
+      if(!root) return [];
+      const targetTable = String(root.internal||root.object||"");
+      if(chainHasTarget(chainToThisTable, targetTable)) return [];
+
+      // обязательные поля
+      const baseFields = [
+        { object:"Наименование", internal:"_Description", type:"Строка" },
+        { object:"Код", internal:"_Code", type:"Строка" }
+      ];
+
+      const fields = referenceFields(root).map(f=>({
+        object: String(f.object||f.title||f.internal||"Поле"),
+        title: String(f.title||""),
+        internal: String(f.internal||f.object||""),
+        type: String(f.type||"")
+      }));
+
+      // склеим, избегая дублей
+      const all = [];
+      const seen = new Set();
+      [...baseFields, ...fields].forEach(f=>{
+        const key = (f.internal||"").toLowerCase();
+        if(!key || seen.has(key)) return;
+        seen.add(key);
+        all.push(f);
+      });
+
+      const nextChain = [...chainToThisTable, { refInternal, targetTable }];
+      const chainLen = nextChain.length;
+
+      return all.map(f=>{
+        const fid = synthId(baseTopId, chainLen, targetTable, String(f.internal||f.object||""));
+        const displayName = f.title || f.object || f.internal || "Поле";
+        const displayPath = `${displayPrefix}.${displayName}`;
+        ensureMeta(fid, {
+          baseTopId,
+          chain: nextChain,
+          tableInternal: targetTable,
+          field: { object:f.object, title:f.title||f.object, internal:f.internal||f.object, type:f.type||"" },
+          displayPath,
+          displayPrefix: displayPath
+        });
+        return { id: fid, object:f.object, title:f.title||f.object, internal:f.internal||f.object, type:f.type||"", __synth:true };
+      });
+    }
+
+    function renderTree(){
+      const q = state.search.trim().toLowerCase();
+
+      const host = $("tree"); host.innerHTML="";
+
+      const renderNode = (nodeId, mount, depth=0) => {
+        const nd = nodeData(nodeId);
+        if(!nd) return;
+        const row = nd.row;
+
+        // filter visibility
+        const selfVisible = nodeMatches(row, q);
+        // children visibility check later (cheap: only for original)
+        if(q && !selfVisible){
+          if(nd.kind==="orig"){
+            const kids = state.children[nodeId] || [];
+            const anyKidVisible = kids.some(k=>nodeMatches(k,q));
+            // also if it's ref field, it may have ref children, but we don't search inside them
+            if(!anyKidVisible) return;
+          } else {
+            // synthetic nodes: if not match, hide
+            return;
+          }
+        }
+
+        // compute children
+        const origKids = (nd.kind==="orig") ? (state.children[nodeId] || []).map(k=>k.id) : [];
+        const isRef = isReferenceField(row) && isReferenceType(row.type) && !isRootRefTable(row);
+        const chainForRef = (nd.kind==="orig") ? [] : (nd.meta.chain||[]);
+        const rootForRef = isRef ? findTargetRoot(row) : null;
+        const targetForRef = rootForRef ? String(rootForRef.internal||rootForRef.object||"") : "";
+        const hasRefKids = isRef && !!rootForRef && chainForRef.length < maxRefDepth() && !chainHasTarget(chainForRef, targetForRef);
+        const open = !!state.expanded[nodeId];
+        const hasKids = origKids.length>0 || hasRefKids;
+
+        const visualKind = nodeVisualKind(row);
+        const visualTitle = visualKind==="vt" ? "Табличная часть: строки этой вкладки могут стать базой плоской таблицы" :
+          visualKind==="ref" ? "Справочник: вложенные поля подтягиваются через LEFT JOIN по _IDRRef" :
+          visualKind==="enum" ? "Перечисление: вложенные поля подтягиваются как справочник/enum через LEFT JOIN" : "";
+        const div = el("div",{className:"node" + (visualKind ? " node-" + visualKind : ""), title:visualTitle});
+
+        const btn = el("button",{
+          className:"btn ghost",
+          style:"padding:1px 7px; line-height:1; min-width:28px",
+          disabled:!hasKids,
+          onclick:()=>{ state.expanded[nodeId]=!open; renderTree(); }
+        }, hasKids ? (open?"−":"+") : "·");
+
+        const cb = el("input",{
+          type:"checkbox",
+          checked:!!state.selected[nodeId],
+          onchange:(e)=>{ state.selected[nodeId]=e.target.checked; renderTree(); renderSQL(); }
+        });
+
+        const label = el("span",{className:"node-label"});
+        const tag = visualKind ? `<span class="tag ${visualKind}">${visualKind==="vt"?"ТЧ":visualKind==="ref"?"Справочник":"Enum"}</span>` : "";
+        label.innerHTML = `${tag}&lt;<b>${HL(row.object,state.search)}</b>${row.type?` <span class="k">type</span>=<span class="v">"${HL(row.type,state.search)}"</span>`:""}${row.internal?` <span class="k">internal</span>=<span class="v">"${HL(row.internal,state.search)}"</span>`:""}&gt;` + (row.title?` <span class="muted">// ${HL(row.title,state.search)}</span>`:"");
+        label.onclick = ()=>{ cb.checked = !cb.checked; cb.dispatchEvent(new Event("change")); };
+        let boolWrap = null;
+        // bool filters (Да/Нет) — влияют на WHERE, если выбрано ровно одно
+        if(isBoolType(row.type) && (state.selected[nodeId] || state.boolFilters[nodeId])){
+          const wrap = el("span",{className:"boolflt"});
+          const cur = state.boolFilters[nodeId] || {};
+          const mk = (key, txt) => {
+            const inp = el("input",{
+              type:"checkbox",
+              checked: !!cur[key],
+              onclick:(ev)=>ev.stopPropagation(),
+              onchange:(e)=>{
+                const next = state.boolFilters[nodeId] || {};
+                next[key] = e.target.checked;
+                if(next.yes || next.no) state.boolFilters[nodeId]=next;
+                else delete state.boolFilters[nodeId];
+                renderSQL();
+              }
+            });
+            const lab = el("label",{onclick:(ev)=>ev.stopPropagation()}, inp, txt);
+            return lab;
+          };
+          wrap.append(mk("yes","Да"), mk("no","Нет"));
+          boolWrap = wrap;
+        }
+
+        // "Плоская" — только для табличных частей (_..._VT...)
+        let flatWrap = null;
+        if(row && isVTTableName(row.internal||"")){
+          const tname = String(row.internal||"");
+          const fkey = tname.toLowerCase();
+          const wrap = el("span",{className:"boolflt", title:"Плоская таблица: базой становятся строки этой табличной части. Выбранные поля шапки документа добавляются через LEFT JOIN и повторяются в каждой строке табличной части."});
+          const inp = el("input",{
+            type:"checkbox",
+            checked: !!state.flatten[fkey],
+            onclick:(ev)=>ev.stopPropagation(),
+            onchange:(e)=>{
+              if(e.target.checked) state.flatten[fkey]=true;
+              else delete state.flatten[fkey];
+              renderSQL();
+            }
+          });
+          const lab = el("label",{onclick:(ev)=>ev.stopPropagation()}, inp, "Плоская");
+          wrap.append(lab);
+          flatWrap = wrap;
+        }
+
+        if(boolWrap && flatWrap) div.append(btn, cb, boolWrap, flatWrap, label);
+        else if(boolWrap) div.append(btn, cb, boolWrap, label);
+        else if(flatWrap) div.append(btn, cb, flatWrap, label);
+        else div.append(btn, cb, label);
+
+        mount.appendChild(div);
+
+        if(hasKids && open){
+          // original children
+          if(origKids.length){
+            const ch = el("div",{className:"children" + (visualKind==="vt" ? " vtshade" : "")});
+            origKids.forEach(cid=>renderNode(cid,ch,depth+1));
+            mount.appendChild(ch);
+          }
+          // reference children
+          if(hasRefKids){
+            const baseTopId = (nd.kind==="orig") ? nodeId : nd.meta.baseTopId;
+            const refInternal = (nd.kind==="orig") ? (row.internal||row.object) : (row.internal||row.object);
+            const refKids = makeRefChildrenFor(nodeId, { row, baseTopId, chainToThisTable: chainForRef, refInternal, displayPrefix: (nd.kind==="orig") ? (row.object||row.title||row.internal) : (nd.meta.displayPrefix||nd.meta.displayPath) });
+            const shadeClass = (( ( (nd.kind==="orig") ? 1 : (nd.meta.chain.length+1) ) ) % 2) ? "refshade1" : "refshade2";
+            const ch2 = el("div",{className:"children "+shadeClass});
+            refKids.forEach(k=>{
+              renderNode(k.id, ch2, depth+1);
+            });
+            mount.appendChild(ch2);
+          }
+        }
+      };
+
+      state.roots.forEach(r=>renderNode(r.id, host, 0));
+
+      $("selCount").textContent = Object.keys(state.selected).filter(id=>state.selected[id]).length;
+      const refCount = Object.keys(state.selected).filter(id=>{
+        if(!state.selected[id]) return false;
+        const nd=nodeData(id); if(!nd) return false;
+        return isReferenceField(nd.row);
+      }).length;
+      $("refCount").textContent = refCount;
+
+      renderPeriodOptions();
+    }
+
+    function renderPeriodOptions(){
+      const select = $("periodField");
+      const selectedOrig = Object.keys(state.selected).filter(id=>state.selected[id] && state.byId[id]).map(id=>state.byId[id]);
+      const dates = selectedOrig.filter(isDateField);
+      const cur = state.periodFieldId;
+      select.innerHTML = '<option value="">— не использовать —</option>' + dates.map(r=>`<option value="${r.id}" ${r.id===cur?'selected':''}>${r.object} ${r.title?`• ${r.title}`:""} ${r.internal?`• ${r.internal}`:""}</option>`).join("");
+      select.onchange = ()=>{ state.periodFieldId = select.value; renderSQL(); };
+    }
+
+    function renderSQL(){
+      const out = $("sql"); const hint = $("sqlHint"); hint.style.display="none"; hint.textContent="";
+      const diag = [];
+      const selectedIds = Object.keys(state.selected).filter(id=>state.selected[id]);
+      if(selectedIds.length===0){ out.value="-- Выберите хотя бы одно поле слева"; renderDiagnostics([]); return; }
+
+      const selectedOrig = selectedIds.filter(id=>state.byId[id]).map(id=>state.byId[id]);
+      const selectedSynth = selectedIds.filter(id=>!state.byId[id]).map(id=>({ id, ...(state.metaById[id]||{}) })).filter(m=>m && m.field);
+
+      const db = state.dbName.trim(), sch = state.schema.trim();
+      const qn=(t)=> qname(db, sch, t);
+
+      const periodField = state.periodFieldId ? (state.byId[state.periodFieldId] || null) : null;
+      const pastMonths = Math.max(0, Number(state.periodMonths||0))||0;
+      const pastDays = Math.max(0, Number(state.periodDays||0))||0;
+      const futureMonths = Math.max(0, Number(state.periodMonthsFuture||0))||0;
+      const futureDays = Math.max(0, Number(state.periodDaysFuture||0))||0;
+
+      // if explicit fromTable
+      if(state.fromTable.trim()){
+        const A="F";
+        const joins = [];
+        let refN=1;
+        const joinMap = {};
+
+        const ensureJoin = (parentAlias, refInternal, targetTable)=>{
+          const key = `${parentAlias}.[${refInternal}]->${targetTable}`;
+          if(joinMap[key]) return joinMap[key];
+          const alias = "R"+(refN++);
+          joinMap[key]=alias;
+          joins.push(`LEFT JOIN ${qn(targetTable)} AS ${alias} ON ${alias}.[_IDRRef] = ${parentAlias}.[${refInternal}]`);
+          diag.push(`JOIN справочника: ${parentAlias}.[${refInternal}] -> ${targetTable} AS ${alias}`);
+          return alias;
+        };
+
+        const cols = [];
+        const wheres = [];
+        let orderBy = "";
+
+        // original selections
+        selectedOrig.forEach(r=>{
+          cols.push(`${castExpr(A, r.internal||r.object, r.type)} AS [${r.title||r.object}]`);
+
+          const v = boolFilterValueForId(r.id);
+          if(v!==null && isBoolType(r.type)){
+            const col = r.internal || r.object;
+            wheres.push(`${castExpr(A, col, r.type)} = ${v}`);
+          }
+        });
+
+        // synthetic selections (chain)
+        selectedSynth.forEach(m=>{
+          const baseTop = state.byId[m.baseTopId];
+          if(!baseTop) return;
+          let curAlias = A;
+          m.chain.forEach(step=>{ curAlias = ensureJoin(curAlias, step.refInternal, step.targetTable); });
+          cols.push(`${castExpr(curAlias, m.field.internal||m.field.object, m.field.type)} AS [${m.displayPath}]`);
+          const v = boolFilterValueForId(m.id);
+          if(v!==null && isBoolType(m.field.type)){
+            const col = m.field.internal || m.field.object;
+            wheres.push(`${castExpr(curAlias, col, m.field.type)} = ${v}`);
+          }
+        });
+
+        // period filter
+        if(periodField && (pastMonths>0 || pastDays>0 || futureMonths>0 || futureDays>0)){
+          const col = periodField.internal || periodField.object;
+          const isDatePF = /_Date_Time$/i.test(col) || col==="_Date_Time" || /дата/i.test(String(periodField.type||"")) || /date|datetime/i.test(String(periodField.type||"").toLowerCase());
+          const dateExpr = isDatePF ? `DATEADD(YEAR, -2000, ${A}.[${col}])` : `${A}.[${col}]`;
+          if(pastMonths>0 || pastDays>0) wheres.push(`${dateExpr} >= ${relativeDateBoundary(pastMonths, pastDays, "past")}`);
+          if(futureMonths>0 || futureDays>0) wheres.push(`${dateExpr} <= ${relativeDateBoundary(futureMonths, futureDays, "future")}`);
+          orderBy = `${dateExpr} DESC`;
+        }
+const lines = [
+          "SELECT",
+          "  " + cols.join(",\n  "),
+          "FROM  " + qn(state.fromTable.trim()) + " AS " + A
+        ];
+        if(joins.length) lines.push(...joins);
+        if(wheres.length) lines.push("WHERE " + wheres.join(" AND "));
+        if(orderBy) lines.push("ORDER BY " + orderBy);
+
+        out.value = lines.join("\n");
+        renderDiagnostics(diag);
+        return;
+      }
+
+      // Buckets by doc prefix
+      const buckets = new Map();
+      function addToBucket(baseRow, origRow, synthMeta){
+        const tblNode = tableFor(baseRow);
+        const table = String((tblNode && (tblNode.internal||tblNode.object))||"");
+        const prefix = getDocPrefix(table);
+        const key = prefix || table || "__unknown__";
+        const b = buckets.get(key) || { origRows:[], synthRows:[], tables:new Set(), prefix };
+        if(origRow) b.origRows.push(origRow);
+        if(synthMeta) b.synthRows.push(synthMeta);
+        if(table) b.tables.add(table);
+        buckets.set(key,b);
+      }
+
+      selectedOrig.forEach(r=>addToBucket(r, r, null));
+      selectedSynth.forEach(m=>{
+        const baseTop = state.byId[m.baseTopId];
+        if(baseTop) addToBucket(baseTop, null, m);
+      });
+
+      if(buckets.size===1 && buckets.has("__unknown__")){
+        hint.textContent = "Не удалось определить таблицу. Укажите поле «FROM — таблица», тогда SQL будет сформирован точно.";
+        hint.style.display = "block";
+        out.value = "-- Укажите FROM в настройках.";
+        renderDiagnostics(["Таблица для выбранных полей не определена автоматически."]);
+        return;
+      }
+
+      function buildFor(b, baseTable, includeHeader){
+        const H="H", T="T";
+        const tables = Array.from(b.tables);
+        const header = b.prefix && (tables.find(t=> !isVTTableName(t) && (getDocPrefix(t)||"").toLowerCase()===b.prefix.toLowerCase()) || tables.find(t=> (getDocPrefix(t)||"").toLowerCase()===b.prefix.toLowerCase()) ) || null;
+        const needJoinHeader = includeHeader && header && baseTable!==header;
+
+        const refJoins = {};
+        let refN = 1;
+        const joinLines = [];
+
+        const ensureJoin = (parentAlias, refInternal, targetTable)=>{
+          const key = `${parentAlias}.[${refInternal}]->${targetTable}`;
+          if(refJoins[key]) return refJoins[key];
+          const alias = "R"+(refN++);
+          refJoins[key]=alias;
+          joinLines.push(`LEFT JOIN ${qn(targetTable)} AS ${alias} ON ${alias}.[_IDRRef] = ${parentAlias}.[${refInternal}]`);
+          diag.push(`JOIN справочника: ${parentAlias}.[${refInternal}] -> ${targetTable} AS ${alias}`);
+          return alias;
+        };
+
+        function aliasForRow(r){
+          const t = tableFor(r); const tname = String((t && (t.internal||t.object))||"");
+          if(header && tname===header) return H;
+          return T;
+        }
+
+        // columns
+        const cols = [];
+        const wheres = [];
+        let orderBy = "";
+
+        // original selected rows for this part
+        b.origRows.forEach(r=>{
+          const t = tableFor(r); const tname = String((t && (t.internal||t.object))||"");
+          const inThis = (baseTable===header) ? (tname===header) : (tname===baseTable || (includeHeader && header && tname===header));
+          if(!inThis) return;
+          const src = (header && tname===header) ? H : T;
+          cols.push(`${castExpr(src, r.internal||r.object, r.type)} AS [${r.title||r.object}]`);
+          const v = boolFilterValueForId(r.id);
+          if(v!==null && isBoolType(r.type)){
+            const col = r.internal || r.object;
+            wheres.push(`${castExpr(src, col, r.type)} = ${v}`);
+          }
+        });
+
+        // synthetic selected rows for this part
+        b.synthRows.forEach(m=>{
+          const baseTop = state.byId[m.baseTopId];
+          if(!baseTop) return;
+          const tBase = tableFor(baseTop); const tnameBase = String((tBase && (tBase.internal||tBase.object))||"");
+          const inThis = (baseTable===header) ? (tnameBase===header) : (tnameBase===baseTable || (includeHeader && header && tnameBase===header));
+          if(!inThis) return;
+
+          let curAlias = (header && tnameBase===header) ? H : T;
+          m.chain.forEach(step=>{
+            curAlias = ensureJoin(curAlias, step.refInternal, step.targetTable);
+          });
+          cols.push(`${castExpr(curAlias, m.field.internal||m.field.object, m.field.type)} AS [${m.displayPath}]`);
+        });
+
+        const lines = ["SELECT","  " + cols.join(",\n  ")];
+
+        if(baseTable===header) lines.push(`FROM  ${qn(header)} AS ${H}`);
+        else if(needJoinHeader){
+          lines.push(`FROM  ${qn(baseTable)} AS ${T}`);
+          {
+            // Пытаемся подобрать корректное поле связи из табличной части на шапку.
+            // Обычно это [<prefix>_IDRRef], но у таблиц могут быть суффиксы X1/X2 и т.п.
+            const vtInternals = new Set(state.rows.filter(r=>{
+              const t = tableFor(r); const tname = String((t && (t.internal||t.object))||"");
+              return tname===baseTable;
+            }).map(r=>String(r.internal||r.object||"").toLowerCase()));
+            const pretty = [
+              `${b.prefix}_IDRRef`,
+              `${b.prefix.replace(/X\d+$/i,"")}_IDRRef`,
+              `${String(header).replace(/X\d+$/i,"")}_IDRRef`,
+              `${String(header).replace(/.*\./,"")}_IDRRef`
+            ];
+            const cand = pretty.map(x=>String(x).toLowerCase());
+            let joinCol = cand.find(c=>vtInternals.has(c)) || cand[0];
+            const joinColPretty = pretty[cand.indexOf(joinCol)] || pretty[0];
+            lines.push(`LEFT JOIN ${qn(header)} AS ${H} ON ${T}.[${joinColPretty}] = ${H}.[_IDRRef]`);
+            diag.push(`JOIN шапки: ${baseTable}.${joinColPretty} -> ${header}._IDRRef`);
+          }
+        } else {
+          lines.push(`FROM  ${qn(baseTable)} AS ${T}`);
+        }
+
+        // joins
+        joinLines.forEach(j=>lines.push(j));
+        // period filter only if the period field belongs to this part
+        const df = periodField;
+        if(df && (pastMonths>0 || pastDays>0 || futureMonths>0 || futureDays>0)){
+          const tdf = tableFor(df); const tnameDf = String((tdf && (tdf.internal||tdf.object))||"");
+          const srcDF = (header && tnameDf===header) ? H : T;
+          const col = df.internal||df.object;
+          const isDateDF = /_Date_Time$/i.test(col) || col==="_Date_Time" || /дата/i.test(String(df.type||"")) || /date|datetime/i.test(String(df.type||"").toLowerCase());
+          const dateExpr = isDateDF ? `DATEADD(YEAR, -2000, ${srcDF}.[${col}])` : `${srcDF}.[${col}]`;
+          if(tnameDf===baseTable || (header && tnameDf===header)){
+            if(pastMonths>0 || pastDays>0) wheres.push(`${dateExpr} >= ${relativeDateBoundary(pastMonths, pastDays, "past")}`);
+            if(futureMonths>0 || futureDays>0) wheres.push(`${dateExpr} <= ${relativeDateBoundary(futureMonths, futureDays, "future")}`);
+            orderBy = `${dateExpr} DESC`;
+          }
+        }
+
+        if(wheres.length) lines.push("WHERE " + wheres.join(" AND "));
+        if(orderBy) lines.push("ORDER BY " + orderBy);
+
+        return lines.join("\n");
+      }
+
+      const parts = [];
+      for(const b of buckets.values()){
+        const tables = Array.from(b.tables);
+        const header = b.prefix && (tables.find(t=> !isVTTableName(t) && (getDocPrefix(t)||"").toLowerCase()===b.prefix.toLowerCase()) || tables.find(t=> (getDocPrefix(t)||"").toLowerCase()===b.prefix.toLowerCase()) ) || null;
+        const rest = tables.filter(t=>t!==header);
+
+        // need header if any original row OR baseTop for synth is in header
+        const needHeaderCols = header && (
+          b.origRows.some(r=>{
+            const t=tableFor(r); const tname=String((t&&(t.internal||t.object))||"");
+            return tname===header;
+          }) ||
+          b.synthRows.some(m=>{
+            const baseTop = state.byId[m.baseTopId];
+            if(!baseTop) return false;
+            const t=tableFor(baseTop); const tname=String((t&&(t.internal||t.object))||"");
+            return tname===header;
+          })
+        );
+
+        if(tables.length===1){
+          diag.push(`Базовая таблица: ${tables[0]}`);
+          parts.push(buildFor(b, tables[0], false));
+        } else if(header){
+          const headerSelected = !!needHeaderCols;
+          // "Плоская" работает только для табличных частей (_VT) и только когда выбраны поля шапки
+          const anyFlatVT = rest.some(t => isVTTableName(t) && !!state.flatten[String(t).toLowerCase()] && headerSelected);
+
+          rest.forEach(t=>{
+            const includeHeader = headerSelected && isVTTableName(t) && !!state.flatten[String(t).toLowerCase()];
+            if(isVTTableName(t)){
+              if(includeHeader) diag.push(`Плоская таблица: ${t} + поля шапки ${header}. Строки табличной части сохраняются, поля шапки повторяются.`);
+              else diag.push(`Табличная часть отдельно: ${t}. Поля шапки не повторяются, если не включена "Плоская".`);
+            } else {
+              diag.push(`Связанная таблица в группе: ${t}`);
+            }
+            parts.push(buildFor(b, t, includeHeader));
+          });
+
+          // Если выбраны поля шапки, но плоская не включена ни на одной табличной части — сформируем отдельный запрос по шапке
+          if(headerSelected && !anyFlatVT){
+            diag.push(`Поля шапки вынесены отдельным SELECT: ${header}. Для одной плоской выдачи включите "Плоская" на нужной _VT.`);
+            parts.push(buildFor(b, header, false));
+          }
+        } else {
+          if(tables.length>1) diag.push(`В одной группе несколько таблиц без явной шапки: ${tables.join(", ")}. Проверьте связи вручную.`);
+          tables.forEach(t=>{
+            diag.push(`Базовая таблица: ${t}`);
+            parts.push(buildFor(b, t, false));
+          });
+        }
+      }
+
+      out.value = parts.join("\n\n-- ##############################################################\n\n");
+      const selectedTables = new Set();
+      selectedOrig.forEach(r=>{
+        const t = tableFor(r);
+        if(t) selectedTables.add(String(t.internal||t.object||""));
+      });
+      selectedSynth.forEach(m=>{
+        if((m.chain||[]).length > 1){
+          diag.push(`Глубокая цепочка справочников (${m.chain.length}): ${chainText(m.chain)}. Проверьте, что это 1:1, иначе возможны размножения строк.`);
+        }
+      });
+      const vtCount = Array.from(selectedTables).filter(isVTTableName).length;
+      if(vtCount > 1){
+        diag.push(`Выбрано несколько табличных частей (${vtCount}). Это может быть связь 1:N или независимые SELECT; не используйте DISTINCT, если нужна детализация.`);
+      }
+      if(state.relationMode === "warn"){
+        diag.push(`Режим 1:N: только предупреждения. SQL не агрегирует строки и сохраняет текущую детализацию.`);
+      } else {
+        diag.push(`Режим 1:N: сохранять строки. Для агрегации ИНЗ/заявок лучше делать отдельный режим STRING_AGG в следующей версии.`);
+      }
+      renderDiagnostics(diag);
+    }
+
+    // UI handlers
+    //$("btn-load").onclick = ()=> $("xlsx").click();
+    $("btn-clear").onclick = ()=>{ state.selected={}; state.boolFilters={}; state.flatten={}; renderTree(); renderSQL(); };
+    $("search").oninput = (e)=>{ state.search=e.target.value; renderTree(); };
+    $("btn-expand").onclick = ()=>{
+      const next={};
+      // expand all original
+      state.rows.forEach(r=>{
+        if((state.children[r.id]||[]).length) next[r.id]=true;
+        // expand refs too
+        if(isReferenceField(r) && isReferenceType(r.type)) next[r.id]=true;
+      });
+      // expand synthetic already known
+      Object.keys(state.metaById).forEach(id=>{
+        const m = state.metaById[id];
+        if(isReferenceType(m.field.type)) next[id]=true;
+      });
+      state.expanded=next; renderTree();
+    };
+    $("btn-collapse").onclick = ()=>{ state.expanded={}; renderTree(); };
+
+    if($("dbName")) $("dbName").oninput = (e)=>{ state.dbName=e.target.value; renderSQL(); };
+    if($("schema")) $("schema").oninput = (e)=>{ state.schema=e.target.value; renderSQL(); };
+    if($("fromTable")) $("fromTable").oninput = (e)=>{ state.fromTable=e.target.value; renderSQL(); };
+    $("periodMonths").oninput = (e)=>{ state.periodMonths = Math.max(0, Number(e.target.value||0)); renderSQL(); };
+    $("periodDays").oninput = (e)=>{ state.periodDays = Math.max(0, Number(e.target.value||0)); renderSQL(); };
+
+    $("periodMonthsFuture").oninput = (e)=>{ state.periodMonthsFuture = Math.max(0, Number(e.target.value||0)); renderSQL(); };
+    $("periodDaysFuture").oninput = (e)=>{ state.periodDaysFuture = Math.max(0, Number(e.target.value||0)); renderSQL(); };
+    $("refDepth").oninput = (e)=>{
+      state.refDepth = Math.max(1, Math.min(5, Number(e.target.value||5)));
+      e.target.value = state.refDepth;
+      renderTree(); renderSQL();
+    };
+    $("relationMode").onchange = (e)=>{ state.relationMode = e.target.value; renderSQL(); };
+
+    $("btn-copy").onclick = async ()=>{
+      const ta=$("sql");
+      try{ await navigator.clipboard.writeText(ta.value); }
+      catch(e){
+        try{ ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly',''); }
+        catch(_){}
+      }
+      $("btn-copy").textContent="Скопировано";
+      setTimeout(()=>$("btn-copy").textContent="Копировать", 1200);
+    };
+
+    const demoBtn = $("btn-demo");
+    if(demoBtn) demoBtn.onclick = ()=>{
+      const demo=[
+        { id:"1", object:"Документы", title:"Документы", internal:"", parentId:null, level:0 },
+        { id:"2", object:"Заявка", title:"Документ.Заявка", internal:"_Document283", parentId:"1", level:1 },
+        { id:"3", object:"Проведен", type:"Булево", internal:"_Posted", title:"Проведен", parentId:"2", level:2 },
+        { id:"4", object:"Дата", type:"ДатаВремя", internal:"_Date_Time", title:"Дата", parentId:"2", level:2 },
+        { id:"5", object:"Агент", type:"Справочник.Сотрудники", internal:"_Fld1412RRef", title:"Агент", parentId:"2", level:2 },
+        // справочник сотрудники
+        { id:"10", object:"Сотрудники", title:"Справочник.Сотрудники", type:"Справочник.Сотрудники", internal:"_Reference777", parentId:null, level:0 },
+        { id:"11", object:"Наименование", type:"Строка", internal:"_Description", title:"Наименование", parentId:"10", level:1 },
+        { id:"12", object:"Код", type:"Строка", internal:"_Code", title:"Код", parentId:"10", level:1 },
+        { id:"13", object:"Гражданство", type:"Перечисление.Гражданство", internal:"_Fld900RRef", title:"Гражданство", parentId:"10", level:1 },
+        // перечисление гражданство
+        { id:"20", object:"Гражданство", title:"Перечисление.Гражданство", type:"Перечисление.Гражданство", internal:"_Enum55", parentId:null, level:0 },
+        { id:"21", object:"Наименование", type:"Строка", internal:"_Description", title:"Наименование", parentId:"20", level:1 }
+      ];
+      state.rows = demo;
+      const built=buildTree(demo); state.byId=built.byId; state.children=built.children; state.roots=built.roots;
+      state.selected = {"3":true,"4":true,"5":true};
+      state.expanded = {"1":true,"2":true,"5":true};
+      state.metaById = {};
+      state.boolFilters = {};
+      renderTree(); renderSQL();
+    };
+
+    $("xlsx").onchange = async (e)=>{
+      const f = e.target.files && e.target.files[0]; if(!f) return;
+      const buf = await f.arrayBuffer();
+      const ext = String(f.name||"").split(".").pop().toLowerCase();
+      try{
+        let rows;
+        if(ext === "mxl"){
+          rows = rowsFromMxlBuffer(buf);
+        } else {
+          const wb = XLSX.read(buf, { type:"array" });
+          const preferred = wb.SheetNames.find(n=>String(n).toLowerCase()==="tdsheet");
+          const sheet = wb.Sheets[preferred || wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(sheet, { defval:"" });
+          rows = rowsFromTableObjects(json);
+        }
+        importRows(rows);
+      } catch(err){
+        alert("Не удалось загрузить файл: " + (err && err.message ? err.message : err));
+      }
+    };
+
+    // init
+    renderTree(); renderSQL();
+  })();
+  </script>
+</body>
+</html>
