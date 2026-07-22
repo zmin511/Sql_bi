@@ -66,6 +66,7 @@ export function createProjectSnapshot(state, appVersion = "0.2.1") {
       flatten: booleanMap(state.flatten)
     },
     query: {
+      serverName: stringValue(state.serverName),
       dbName: stringValue(state.dbName),
       schema: stringValue(state.schema, "dbo"),
       fromTable: stringValue(state.fromTable),
@@ -140,6 +141,7 @@ export function parseProjectSnapshot(input) {
     flatten: booleanMap(selection.flatten),
     expanded: Object.fromEntries(Object.entries(booleanMap(view.expanded)).filter(([id]) => ids.has(id) || own(safeSynthetic, id))),
     search: stringValue(view.search),
+    serverName: stringValue(query.serverName),
     dbName: stringValue(query.dbName),
     schema: stringValue(query.schema, "dbo"),
     fromTable: stringValue(query.fromTable),

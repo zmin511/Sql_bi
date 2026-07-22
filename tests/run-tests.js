@@ -7,6 +7,7 @@ import { sqlDateExpr, relativeDateBoundary } from "../src/core/dates.js";
 import { castExpr } from "../src/core/casts.js";
 import { generateSql, qname } from "../src/core/sqlGenerate.js";
 import { createProjectSnapshot, parseProjectSnapshot } from "../src/core/project.js";
+import { createPowerQuery, createPowerQueryExport, escapePowerQueryText } from "../src/core/powerQuery.js";
 
 const tests = [];
 function test(name, fn) {
@@ -155,7 +156,7 @@ test("project snapshot round-trips structure, selection, and query settings", ()
     selected: { "2": true, synthetic: true },
     metaById: { synthetic: { field: { id: "ref", internal: "_Description" }, chain: [] } },
     boolFilters: {}, flatten: { "_document100_vt200": true }, expanded: { "1": true },
-    search: "Дата", dbName: "UMC", schema: "dbo", fromTable: "",
+    search: "Дата", serverName: "srv-sql-02", dbName: "UMC", schema: "dbo", fromTable: "",
     periodFieldId: "2", periodMode: "manual", dateFrom: "2026-07-01", dateTo: "2026-07-21",
     periodMonths: 2, periodDays: 3, periodMonthsFuture: 1, periodDaysFuture: 4,
     refDepth: 4, relationMode: "warn"
@@ -164,6 +165,7 @@ test("project snapshot round-trips structure, selection, and query settings", ()
   assert.equal(restored.rows.length, 2);
   assert.deepEqual(restored.selected, { "2": true, synthetic: true });
   assert.ok(restored.metaById.synthetic);
+  assert.equal(restored.serverName, "srv-sql-02");
   assert.equal(restored.dbName, "UMC");
   assert.equal(restored.periodFieldId, "2");
   assert.equal(restored.periodMode, "manual");
@@ -184,6 +186,38 @@ test("project parser rejects wrong formats and removes stale field IDs", () => {
   assert.deepEqual(restored.selected, { "1": true });
   assert.deepEqual(restored.boolFilters, {});
   assert.equal(restored.periodFieldId, "");
+});
+
+test("Power Query executes native SQL without forced folding and escapes M text", () => {
+  const sql = 'SELECT T.[Name] AS [Название "тест"]\r\nFROM [UMC].[dbo].[_Document100] AS T\r\n-- #tag';
+  const result = createPowerQuery({ server: 'srv-"sql"', database: "UMC", sql });
+  assert.match(result, /Source = Sql\.Database\("srv-""sql""", "UMC"\)/);
+  assert.match(result, /SqlText = "SELECT T\.\[Name\] AS \[Название ""тест""\]#\(lf\)FROM/);
+  assert.match(result, /-- #\(#\)tag"/);
+  assert.match(result, /Value\.NativeQuery\(Source, SqlText, null\)/);
+  assert.doesNotMatch(result, /EnableFolding/);
+  assert.equal(escapePowerQueryText("a\r\nb"), "a#(lf)b");
+});
+
+test("Power Query preserves ORDER BY without enabling query folding", () => {
+  const sql = "SELECT T.[_Date_Time]\nFROM [UMC].[dbo].[_Document100] AS T\nORDER BY T.[_Date_Time] DESC";
+  const result = createPowerQuery({ server: "srv-sql-02", database: "UMC", sql });
+  assert.match(result, /ORDER BY T\.\[_Date_Time\] DESC/);
+  assert.match(result, /Value\.NativeQuery\(Source, SqlText, null\)/);
+  assert.doesNotMatch(result, /EnableFolding/);
+});
+
+test("Power Query export validates connection and creates UTF-8 PQ file", () => {
+  const sql = "SELECT T.[_IDRRef]\nFROM [dbo].[_Document100] AS T";
+  assert.throws(() => createPowerQuery({ server: "", database: "UMC", sql }), /SQL Server/);
+  assert.throws(() => createPowerQuery({ server: "srv", database: "", sql }), /базу данных/);
+  const exported = createPowerQueryExport(
+    { server: "srv", database: "UMC", sql },
+    new Date("2026-07-22T12:00:00Z")
+  );
+  assert.equal(exported.filename, "sql_bi_Document100_2026-07-22_power_query.pq");
+  assert.equal(exported.content.charCodeAt(0), 0xfeff);
+  assert.match(exported.content, /Value\.NativeQuery/);
 });
 
 let passed = 0;
