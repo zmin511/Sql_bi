@@ -187,6 +187,7 @@
     <div class="card span-all">
       <h2>Результат: SQL
         <span class="row">
+          <button class="btn secondary" id="btn-download-sql" type="button" disabled>Скачать .sql</button>
           <button class="btn ghost" id="btn-copy">Копировать</button>
         </span>
       </h2>
@@ -1715,6 +1716,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
     function renderSQL(){
       const out = $("sql"); const hint = $("sqlHint"); hint.style.display="none"; hint.textContent="";
+      queueMicrotask(syncSqlExportButton);
       const diag = Object.values(state.referenceDiagnostics||{});
       const requestedIds = Object.keys(state.selected).filter(id=>state.selected[id]);
       Object.keys(state.boolFilters||{}).filter(id=>{
@@ -2232,6 +2234,60 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       setTimeout(()=>$("btn-copy").textContent="Копировать", 1200);
     };
 
+    function hasGeneratedSql(sql){
+      const text=String(sql||"").trim();
+      return /^SELECT\b/i.test(text) && /\bFROM\b/i.test(text);
+    }
+
+    function safeSqlFilePart(value){
+      const cleaned=String(value||"")
+        .replace(/[\[\]]/g, "")
+        .replace(/[^0-9A-Za-zА-Яа-яЁё_-]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 80);
+      return cleaned || "query";
+    }
+
+    function sqlExportFileName(sql, date=new Date()){
+      const fromMatch=String(sql||"").match(/\bFROM\s+(?:\[[^\]]+\]\.)?(?:\[[^\]]+\]\.)?\[([^\]]+)\]/i);
+      const manual=state.fromTable.trim().split(/[.\\/]/).pop();
+      const table=safeSqlFilePart((fromMatch&&fromMatch[1]) || manual || "query");
+      const stamp=date.toISOString().slice(0,10);
+      return `sql_bi_${table}_${stamp}.sql`;
+    }
+
+    function createSqlExport(sql, date=new Date()){
+      const text=String(sql||"").trim();
+      if(!hasGeneratedSql(text)) throw new Error("Сначала сформируйте SQL-запрос");
+      return {
+        filename:sqlExportFileName(text,date),
+        content:"\uFEFF"+text+"\r\n",
+        mimeType:"text/sql;charset=utf-8"
+      };
+    }
+
+    function syncSqlExportButton(){
+      const button=$("btn-download-sql");
+      if(button) button.disabled=!hasGeneratedSql($("sql").value);
+    }
+
+    $("btn-download-sql").onclick = ()=>{
+      try{
+        const exported=createSqlExport($("sql").value);
+        const blob=new Blob([exported.content], {type:exported.mimeType});
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement("a");
+        link.href=url;
+        link.download=exported.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 0);
+      } catch(err){
+        alert(err && err.message ? err.message : String(err));
+      }
+    };
+
     const demoBtn = $("btn-demo");
     if(demoBtn) demoBtn.onclick = ()=>{
       const demo=[
@@ -2316,6 +2372,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       physicalJoinKey, tablePartOwnerName, getDocPrefix, isVTTableName,
       selectionObjectDescriptor, resolveSelectionContext,
       createProjectSnapshot, parseProjectSnapshot, applyProjectSnapshot,
+      hasGeneratedSql, safeSqlFilePart, sqlExportFileName, createSqlExport,
       renderSQL
     };
 
