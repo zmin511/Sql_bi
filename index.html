@@ -78,9 +78,9 @@
       <span>v0.2.1</span>
     </div>
     <div class="card">
-      <h2>Структура из XLSX/MXL (единое дерево)
+      <h2>Структура из XLSX/MXL/XML (единое дерево)
         <span class="row">
-          <input type="file" id="xlsx" accept=".xlsx,.xls,.mxl" class="file-input"/>
+          <input type="file" id="xlsx" accept=".xlsx,.xls,.mxl,.xml" class="file-input"/>
           <input type="file" id="projectFile" accept=".json,.sqlbi" class="file-input"/>
           <label class="btn secondary" id="btn-load" for="xlsx">Загрузить файл</label>
           <button class="btn secondary" id="btn-save-project" type="button">Сохранить проект</button>
@@ -466,13 +466,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       return new TextDecoder("utf-8").decode(bytes.slice(start));
     }
 
-    function rowsFromMxlBuffer(buf){
-      const text = decodeMxlText(buf);
-      const bytes = new Uint8Array(buf);
-      const signature = String.fromCharCode(bytes[0]||0, bytes[1]||0, bytes[2]||0, bytes[3]||0, bytes[4]||0, bytes[5]||0);
-      if(signature !== "MOXCEL"){
-        throw new Error("Файл не похож на MXL: не найден заголовок MOXCEL");
-      }
+    function rowsFromMxlText(text, sourceName="MXL"){
       const headers = ["Объекты","Тип","Список типов","Уровень","Полное имя","Номер картинки","Метаданные","Внутреннее имя"];
       const cells = [];
       const re = /\{16,\d+,\s*\{1,(?:1,\s*\{"#","((?:[^"\\]|\\.)*)"\}|0)\s*\},0\}/g;
@@ -487,7 +481,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       }
 
       const headerIndex = table.findIndex(row => headers.every((h,j)=>row[j]===h));
-      if(headerIndex < 0) throw new Error("В MXL не найдена строка заголовков структуры");
+      if(headerIndex < 0) throw new Error(`В ${sourceName} не найдена строка заголовков структуры`);
 
       const json = table.slice(headerIndex+1).map(row => {
         const rec = {};
@@ -496,9 +490,123 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       }).filter(rec => rec["Объекты"] || rec["Внутреннее имя"] || rec["Полное имя"]);
 
       if(!json.length){
-        throw new Error("В MXL не найдены строки структуры после заголовков");
+        throw new Error(`В ${sourceName} не найдены строки структуры после заголовков`);
       }
       return rowsFromTableObjects(json);
+    }
+
+    function rowsFromMxlBuffer(buf){
+      const bytes = new Uint8Array(buf);
+      const signature = String.fromCharCode(bytes[0]||0, bytes[1]||0, bytes[2]||0, bytes[3]||0, bytes[4]||0, bytes[5]||0);
+      if(signature !== "MOXCEL"){
+        throw new Error("Файл не похож на MXL: не найден заголовок MOXCEL");
+      }
+      return rowsFromMxlText(decodeMxlText(buf), "MXL");
+    }
+
+    function bytesFromBase64(value){
+      const compact=String(value||"").replace(/\s+/g,"");
+      if(!compact || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact)){
+        throw new Error("XML ValueStorage не содержит корректных данных Base64");
+      }
+      let binary;
+      try{ binary=atob(compact); }
+      catch(_){ throw new Error("XML ValueStorage содержит повреждённые данные Base64"); }
+      const bytes=new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+      return bytes;
+    }
+
+    async function inflateRaw(bytes){
+      if(typeof DecompressionStream!=="function"){
+        throw new Error("Этот браузер не поддерживает распаковку XML 1С. Обновите браузер или используйте MXL");
+      }
+      try{
+        const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        return await new Response(stream).arrayBuffer();
+      } catch(_){
+        throw new Error("Не удалось распаковать данные ValueStorage из XML 1С");
+      }
+    }
+
+    function readSerializedValue(text,start){
+      let i=start;
+      while(/\s/.test(text[i]||"")) i++;
+      const begin=i;
+      if(text[i]==="{"){
+        let depth=0,quoted=false,escaped=false;
+        for(;i<text.length;i++){
+          const char=text[i];
+          if(quoted){
+            if(escaped) escaped=false;
+            else if(char==="\\") escaped=true;
+            else if(char==='"') quoted=false;
+          } else if(char==='"') quoted=true;
+          else if(char==="{") depth++;
+          else if(char==="}" && --depth===0) return {raw:text.slice(begin,i+1),end:i+1};
+        }
+        throw new Error("Повреждённое сериализованное значение в XML 1С");
+      }
+      while(i<text.length && text[i]!=="," && text[i]!=="}") i++;
+      return {raw:text.slice(begin,i).trim(),end:i};
+    }
+
+    function serializedScalar(raw){
+      let match=String(raw||"").match(/^\{"S","((?:[^"\\]|\\.)*)"/s);
+      if(match) return match[1].replace(/\\"/g,'"').replace(/\\\\/g,"\\");
+      match=String(raw||"").match(/^\{"N",([^,}]+)/);
+      if(match) return match[1].trim();
+      match=String(raw||"").match(/^\{"B",([^,}]+)/);
+      if(match) return match[1].trim()==="1" ? "true" : "false";
+      return "";
+    }
+
+    function rowsFromValueStorageText(text){
+      const rows=[];
+      const rowStart=/\{2,(\d+),(\d+),/g;
+      let match;
+      while((match=rowStart.exec(text))){
+        const valueCount=Number(match[2]);
+        if(valueCount<7) continue;
+        let position=rowStart.lastIndex;
+        const values=[];
+        for(let index=0;index<valueCount;index++){
+          const value=readSerializedValue(text,position);
+          values.push(serializedScalar(value.raw));
+          position=value.end;
+          while(/\s/.test(text[position]||"")) position++;
+          if(index<valueCount-1 && text[position]===",") position++;
+        }
+        rows.push({
+          id:String(match[1]),
+          object:String(values[1]||values[5]||values[8]||`Поле ${rows.length+1}`),
+          type:values[2] ? String(values[2]) : undefined,
+          internal:values[8] ? String(values[8]) : undefined,
+          metadata:values[7] ? String(values[7]) : undefined,
+          title:values[5] ? String(values[5]) : undefined,
+          parentId:null,
+          level:values[4]!==undefined && values[4]!=="" ? Number(values[4]) : undefined
+        });
+      }
+      if(!rows.length) throw new Error("В XML ValueStorage не найдены строки структуры 1С");
+      return rows;
+    }
+
+    async function rowsFromValueStorageXmlBuffer(buf){
+      const xmlText=new TextDecoder("utf-8").decode(new Uint8Array(buf)).replace(/^\uFEFF/,"");
+      const xml=new DOMParser().parseFromString(xmlText,"application/xml");
+      if(xml.querySelector("parsererror")) throw new Error("XML-файл повреждён или имеет неверный формат");
+      const root=xml.documentElement;
+      const xsiType=root && root.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance","type");
+      if(!root || (root.localName!=="ValueStorage" && !/ValueStorage$/i.test(String(xsiType||"")))){
+        throw new Error("Поддерживается XML 1С с корневым элементом ValueStorage");
+      }
+      const packed=bytesFromBase64(root.textContent);
+      if(packed.length<=18 || packed[0]!==0x02 || packed[1]!==0x01){
+        throw new Error("Неподдерживаемый вариант ValueStorage XML 1С; сохраните структуру в MXL");
+      }
+      const inflated=await inflateRaw(packed.slice(18));
+      return rowsFromValueStorageText(decodeMxlText(inflated));
     }
 
     function isReferenceType(typeStr){
@@ -2182,6 +2290,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         let rows;
         if(ext === "mxl"){
           rows = rowsFromMxlBuffer(buf);
+        } else if(ext === "xml"){
+          rows = await rowsFromValueStorageXmlBuffer(buf);
         } else {
           const wb = XLSX.read(buf, { type:"array" });
           const preferred = wb.SheetNames.find(n=>String(n).toLowerCase()==="tdsheet");
@@ -2198,7 +2308,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     // Диагностический API не меняет интерфейс приложения и используется только
     // локальной автоматической регрессией portable HTML.
     window.__SQLBI_TEST__ = {
-      state, buildTree, importRows, rowsFromMxlBuffer, isSelectableField,
+      state, buildTree, importRows, rowsFromMxlText, rowsFromMxlBuffer,
+      bytesFromBase64, inflateRaw, rowsFromValueStorageText, rowsFromValueStorageXmlBuffer, isSelectableField,
       resolveReferenceTarget, validateJoinChain, quoteIdentifier, qname,
       parseNumericType, castExpr, sqlDateExpr, buildRelativeDateRange,
       parseIsoCalendarDate, buildManualDateRange, resolveTablePartHeaderJoin,
