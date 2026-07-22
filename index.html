@@ -109,6 +109,10 @@
         <div class="grid" style="gap:8px">
           <div class="row" style="gap:10px; align-items:flex-end">
             <div style="flex:1; min-width:180px">
+              <label class="muted">SQL Server</label>
+              <input id="serverName" class="input" placeholder="например, srv-sql-02"/>
+            </div>
+            <div style="flex:1; min-width:180px">
               <label class="muted">База данных</label>
               <input id="dbName" class="input" placeholder="например, UMC"/>
             </div>
@@ -187,6 +191,7 @@
     <div class="card span-all">
       <h2>Результат: SQL
         <span class="row">
+          <button class="btn secondary" id="btn-download-power-query" type="button" disabled>Скачать Power Query</button>
           <button class="btn secondary" id="btn-download-sql" type="button" disabled>Скачать .sql</button>
           <button class="btn ghost" id="btn-copy">Копировать</button>
         </span>
@@ -233,7 +238,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       selected: {},      // id -> true
       expanded: {},      // id -> true
       search: "",
-      dbName:"", schema:"dbo", fromTable:"",
+      serverName:"", dbName:"", schema:"dbo", fromTable:"",
       periodFieldId:"", periodMode:"relative", dateFrom:"", dateTo:"",
       periodMonths:3, periodDays:0, periodMonthsFuture:0, periodDaysFuture:0,
       refDepth:5, relationMode:"detail",
@@ -300,7 +305,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           flatten:projectBooleanMap(state.flatten)
         },
         query:{
-          dbName:projectString(state.dbName), schema:projectString(state.schema,"dbo"), fromTable:projectString(state.fromTable),
+          serverName:projectString(state.serverName), dbName:projectString(state.dbName), schema:projectString(state.schema,"dbo"), fromTable:projectString(state.fromTable),
           periodFieldId:projectString(state.periodFieldId), periodMode:state.periodMode==="manual"?"manual":"relative",
           dateFrom:projectDate(state.dateFrom), dateTo:projectDate(state.dateTo),
           periodMonths:projectInteger(state.periodMonths,3,0,1200), periodDays:projectInteger(state.periodDays,0,0,36600),
@@ -345,7 +350,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         boolFilters:Object.fromEntries(Object.entries(projectBoolFilters(selection.boolFilters)).filter(([id])=>ids.has(id))),
         flatten:projectBooleanMap(selection.flatten),
         expanded:Object.fromEntries(Object.entries(projectBooleanMap(view.expanded)).filter(([id])=>ids.has(id) || metaById[id])),
-        search:projectString(view.search), dbName:projectString(query.dbName), schema:projectString(query.schema,"dbo"),
+        search:projectString(view.search), serverName:projectString(query.serverName), dbName:projectString(query.dbName), schema:projectString(query.schema,"dbo"),
         fromTable:projectString(query.fromTable), periodFieldId:ids.has(periodFieldId)?periodFieldId:"",
         periodMode:query.periodMode==="manual"?"manual":"relative", dateFrom:projectDate(query.dateFrom), dateTo:projectDate(query.dateTo),
         periodMonths:projectInteger(query.periodMonths,3,0,1200), periodDays:projectInteger(query.periodDays,0,0,36600),
@@ -424,7 +429,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       state.selected=restored.selected; state.metaById=restored.metaById;
       state.boolFilters=restored.boolFilters; state.flatten=restored.flatten; state.expanded=restored.expanded;
       state.referenceDiagnostics={}; state.search=restored.search;
-      state.dbName=restored.dbName; state.schema=restored.schema; state.fromTable=restored.fromTable;
+      state.serverName=restored.serverName; state.dbName=restored.dbName; state.schema=restored.schema; state.fromTable=restored.fromTable;
       state.periodFieldId=restored.periodFieldId; state.periodMode=restored.periodMode;
       state.dateFrom=restored.dateFrom; state.dateTo=restored.dateTo;
       state.periodMonths=restored.periodMonths; state.periodDays=restored.periodDays;
@@ -432,7 +437,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       state.refDepth=restored.refDepth; state.relationMode=restored.relationMode;
 
       $("search").value=state.search;
-      $("dbName").value=state.dbName; $("schema").value=state.schema; $("fromTable").value=state.fromTable;
+      $("serverName").value=state.serverName; $("dbName").value=state.dbName; $("schema").value=state.schema; $("fromTable").value=state.fromTable;
       $("dateFrom").value=state.dateFrom; $("dateTo").value=state.dateTo;
       $("periodMonths").value=state.periodMonths; $("periodDays").value=state.periodDays;
       $("periodMonthsFuture").value=state.periodMonthsFuture; $("periodDaysFuture").value=state.periodDaysFuture;
@@ -1716,7 +1721,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
     function renderSQL(){
       const out = $("sql"); const hint = $("sqlHint"); hint.style.display="none"; hint.textContent="";
-      queueMicrotask(syncSqlExportButton);
+      queueMicrotask(syncExportButtons);
       const diag = Object.values(state.referenceDiagnostics||{});
       const requestedIds = Object.keys(state.selected).filter(id=>state.selected[id]);
       Object.keys(state.boolFilters||{}).filter(id=>{
@@ -2187,6 +2192,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     };
     $("btn-collapse").onclick = ()=>{ state.expanded={}; renderTree(); };
 
+    if($("serverName")) $("serverName").oninput = (e)=>{ state.serverName=e.target.value; renderSQL(); };
     if($("dbName")) $("dbName").oninput = (e)=>{ state.dbName=e.target.value; renderSQL(); };
     if($("schema")) $("schema").oninput = (e)=>{ state.schema=e.target.value; renderSQL(); };
     if($("fromTable")) $("fromTable").oninput = (e)=>{ state.fromTable=e.target.value; renderSQL(); };
@@ -2266,9 +2272,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       };
     }
 
-    function syncSqlExportButton(){
-      const button=$("btn-download-sql");
-      if(button) button.disabled=!hasGeneratedSql($("sql").value);
+    function syncExportButtons(){
+      const validSql=hasGeneratedSql($("sql").value);
+      const sqlButton=$("btn-download-sql");
+      if(sqlButton) sqlButton.disabled=!validSql;
+      const powerQueryButton=$("btn-download-power-query");
+      if(powerQueryButton) powerQueryButton.disabled=!validSql || !state.serverName.trim() || !state.dbName.trim();
     }
 
     $("btn-download-sql").onclick = ()=>{
@@ -2283,6 +2292,57 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         link.click();
         link.remove();
         setTimeout(()=>URL.revokeObjectURL(url), 0);
+      } catch(err){
+        alert(err && err.message ? err.message : String(err));
+      }
+    };
+
+    function escapePowerQueryText(value){
+      return String(value||"")
+        .replace(/\r\n?/g,"\n")
+        .replace(/#/g,"#(#)")
+        .replace(/"/g,'""')
+        .replace(/\n/g,"#(lf)");
+    }
+
+    function createPowerQuery(server,database,sql){
+      const serverName=String(server||"").trim();
+      const databaseName=String(database||"").trim();
+      const sqlText=String(sql||"").trim();
+      if(!serverName) throw new Error("Укажите SQL Server.");
+      if(!databaseName) throw new Error("Укажите базу данных.");
+      if(!hasGeneratedSql(sqlText)) throw new Error("Сначала сформируйте SQL-запрос.");
+      return [
+        "let",
+        `    Source = Sql.Database("${escapePowerQueryText(serverName)}", "${escapePowerQueryText(databaseName)}"),`,
+        `    SqlText = "${escapePowerQueryText(sqlText)}",`,
+        "    Data = Value.NativeQuery(Source, SqlText, null)",
+        "in",
+        "    Data"
+      ].join("\r\n");
+    }
+
+    function createPowerQueryExport(server,database,sql,date=new Date()){
+      const sqlFileName=sqlExportFileName(sql,date).replace(/\.sql$/i,"");
+      return {
+        filename:`${sqlFileName}_power_query.pq`,
+        content:"\uFEFF"+createPowerQuery(server,database,sql)+"\r\n",
+        mimeType:"text/plain;charset=utf-8"
+      };
+    }
+
+    $("btn-download-power-query").onclick = ()=>{
+      try{
+        const exported=createPowerQueryExport(state.serverName,state.dbName,$("sql").value);
+        const blob=new Blob([exported.content],{type:exported.mimeType});
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement("a");
+        link.href=url;
+        link.download=exported.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),0);
       } catch(err){
         alert(err && err.message ? err.message : String(err));
       }
@@ -2373,6 +2433,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       selectionObjectDescriptor, resolveSelectionContext,
       createProjectSnapshot, parseProjectSnapshot, applyProjectSnapshot,
       hasGeneratedSql, safeSqlFilePart, sqlExportFileName, createSqlExport,
+      escapePowerQueryText, createPowerQuery, createPowerQueryExport,
       renderSQL
     };
 
