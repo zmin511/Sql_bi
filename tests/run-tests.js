@@ -6,6 +6,7 @@ import { isBoolType, isDateField, isReferenceField, isReferenceType } from "../s
 import { sqlDateExpr, relativeDateBoundary } from "../src/core/dates.js";
 import { castExpr } from "../src/core/casts.js";
 import { generateSql, qname } from "../src/core/sqlGenerate.js";
+import { createProjectSnapshot, parseProjectSnapshot } from "../src/core/project.js";
 
 const tests = [];
 function test(name, fn) {
@@ -141,6 +142,48 @@ test("generateSql detects VT table and joins document header in flat mode", () =
   assert.match(result.sql, /H\.\[_Number\] AS \[Number\]/);
   assert.match(result.sql, /CAST\(T\.\[_Fld300\] AS int\) AS \[Qty\]/);
   assert.ok(result.diagnostics.some(item => item.includes("JOIN header")));
+});
+
+test("project snapshot round-trips structure, selection, and query settings", () => {
+  const rows = [
+    { id: "1", object: "Document", internal: "_Document100", parentId: null },
+    { id: "2", object: "Date", internal: "_Date_Time", type: "datetime", parentId: "1" }
+  ];
+  const snapshot = createProjectSnapshot({
+    rows,
+    byId: { "1": rows[0], "2": rows[1] },
+    selected: { "2": true, synthetic: true },
+    metaById: { synthetic: { field: { id: "ref", internal: "_Description" }, chain: [] } },
+    boolFilters: {}, flatten: { "_document100_vt200": true }, expanded: { "1": true },
+    search: "Дата", dbName: "UMC", schema: "dbo", fromTable: "",
+    periodFieldId: "2", periodMode: "manual", dateFrom: "2026-07-01", dateTo: "2026-07-21",
+    periodMonths: 2, periodDays: 3, periodMonthsFuture: 1, periodDaysFuture: 4,
+    refDepth: 4, relationMode: "warn"
+  });
+  const restored = parseProjectSnapshot(JSON.stringify(snapshot));
+  assert.equal(restored.rows.length, 2);
+  assert.deepEqual(restored.selected, { "2": true, synthetic: true });
+  assert.ok(restored.metaById.synthetic);
+  assert.equal(restored.dbName, "UMC");
+  assert.equal(restored.periodFieldId, "2");
+  assert.equal(restored.periodMode, "manual");
+  assert.equal(restored.refDepth, 4);
+  assert.equal(restored.relationMode, "warn");
+});
+
+test("project parser rejects wrong formats and removes stale field IDs", () => {
+  assert.throws(() => parseProjectSnapshot("{"), /некорректный JSON/);
+  assert.throws(() => parseProjectSnapshot({ kind: "other", formatVersion: 1 }), /не проект SQL BI/);
+  const project = {
+    kind: "sql-bi-project", formatVersion: 1,
+    structure: { rows: [{ id: "1", object: "Field" }] },
+    selection: { selected: { "1": true, missing: true }, boolFilters: { missing: { yes: true } } },
+    query: { periodFieldId: "missing" }
+  };
+  const restored = parseProjectSnapshot(project);
+  assert.deepEqual(restored.selected, { "1": true });
+  assert.deepEqual(restored.boolFilters, {});
+  assert.equal(restored.periodFieldId, "");
 });
 
 let passed = 0;
