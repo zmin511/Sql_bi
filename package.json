@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/run-tests.js && node tests/production-characterization.test.js && node tests/selection-parity.test.js && node tests/numeric-parity.test.js",
+    "test": "node tests/run-tests.js && node tests/production-characterization.test.js && node tests/selection-parity.test.js && node tests/numeric-parity.test.js && node tests/numeric-cast-parity.test.js",
     "check:portable": "node scripts/check-portable.mjs"
   }
 }

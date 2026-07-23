@@ -1,12 +1,77 @@
 import { isBoolType } from "./types.js";
 
-export function castExpr(alias, column, type = "") {
-  const expr = alias ? `${alias}.[${column}]` : `[${column}]`;
-  const isDate = /_Date_Time$/i.test(column) || column === "_Date_Time" || /дата/i.test(String(type)) || /date|datetime/i.test(String(type).toLowerCase());
-  if (isDate) return `DATEADD(YEAR, -2000, ${expr})`;
-  if (/RRef$/i.test(column) || /_IDRRef$/i.test(column)) return `CAST(${expr} AS uniqueidentifier)`;
-  if (isBoolType(type)) return `CAST(${expr} AS int)`;
-  if (/int|number|numeric/.test(String(type).toLowerCase())) return `CAST(${expr} AS int)`;
+export function castExpr(
+  alias,
+  column,
+  type = "",
+  diagnostics,
+  context
+) {
+  const expr = alias
+    ? `${alias}.[${column}]`
+    : `[${column}]`;
+
+  const isDate =
+    /_Date_Time$/i.test(column) ||
+    column === "_Date_Time" ||
+    /дата/i.test(String(type)) ||
+    /date|datetime/i.test(String(type).toLowerCase());
+
+  if (isDate) {
+    return `DATEADD(YEAR, -2000, ${expr})`;
+  }
+
+  if (
+    /RRef$/i.test(column) ||
+    /_IDRRef$/i.test(column)
+  ) {
+    return `CAST(${expr} AS uniqueidentifier)`;
+  }
+
+  if (isBoolType(type)) {
+    return `CAST(${expr} AS int)`;
+  }
+
+  const numeric = parseNumericType(type);
+
+  if (numeric.matched) {
+    return `CAST(${expr} AS decimal(${numeric.precision},${numeric.scale}))`;
+  }
+
+  addTypeDiagnostic(
+    diagnostics,
+    typeDiagnosticMessage(type, numeric, context)
+  );
+
+  const normalized = normalizeTypeName(type);
+
+  if (
+    !isCompositeType(normalized) &&
+    /^(?:int|integer)$/iu.test(normalized)
+  ) {
+    return `CAST(${expr} AS int)`;
+  }
+
+  if (
+    !isCompositeType(normalized) &&
+    /^bigint$/iu.test(normalized)
+  ) {
+    return `CAST(${expr} AS bigint)`;
+  }
+
+  if (
+    numeric.reason !== "composite_type" &&
+    isCompositeType(normalized) &&
+    /(?:^|;)\s*(?:булево|логический|логическое|boolean|bool|bit|дата|датавремя|date|datetime|datetime2|smalldatetime)\s*(?:;|$)/iu.test(
+      normalized
+    )
+  ) {
+    addTypeDiagnostic(
+      diagnostics,
+      `${context || "Поле"}: составной неоднозначный тип «${normalized}»; преобразование намеренно не применено.`
+    );
+  }
+
   return expr;
 }
 
@@ -119,4 +184,39 @@ export function parseNumericType(typeString) {
     reason: "ok",
     composite: false
   };
+}
+
+function addTypeDiagnostic(diagnostics, message) {
+  if (
+    !Array.isArray(diagnostics) ||
+    !message ||
+    diagnostics.includes(message)
+  ) {
+    return;
+  }
+
+  diagnostics.push(message);
+}
+
+function typeDiagnosticMessage(type, parsed, context) {
+  const label = context || "Поле";
+  const shown = normalizeTypeName(type) || "пустой тип";
+
+  if (parsed.reason === "invalid_precision") {
+    return `${label}: precision в типе «${shown}» должен быть от 1 до 38; преобразование намеренно не применено.`;
+  }
+
+  if (parsed.reason === "invalid_scale") {
+    return `${label}: scale в типе «${shown}» должен быть от 0 до precision; преобразование намеренно не применено.`;
+  }
+
+  if (parsed.reason === "unknown_numeric_format") {
+    return `${label}: неизвестный числовой формат «${shown}»; преобразование намеренно не применено.`;
+  }
+
+  if (parsed.reason === "composite_type") {
+    return `${label}: составной неоднозначный тип «${shown}»; числовое преобразование намеренно не применено.`;
+  }
+
+  return null;
 }
