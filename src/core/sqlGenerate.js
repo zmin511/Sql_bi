@@ -1,7 +1,7 @@
 import { castExpr } from "./casts.js";
-import { relativeDateBoundary } from "./dates.js";
+import { buildManualDateRange, buildRelativeDateRange, sqlDateExpr } from "./dates.js";
 import { getDocPrefix, isVTTableName, tableFor } from "./tableDetect.js";
-import { isBoolType } from "./types.js";
+import { isBoolType, isDateField } from "./types.js";
 
 export function qname(db, schema, table) {
   const dbPart = db ? `[${db}].` : "";
@@ -27,47 +27,124 @@ function asTableName(row) {
   return String((row && (row.internal || row.object)) || "");
 }
 
-function periodOptions(input) {
+function periodSettings(input) {
   return {
-    pastMonths: Math.max(0, Number(input.periodMonths || 0)) || 0,
-    pastDays: Math.max(0, Number(input.periodDays || 0)) || 0,
-    futureMonths: Math.max(0, Number(input.periodMonthsFuture || 0)) || 0,
-    futureDays: Math.max(0, Number(input.periodDaysFuture || 0)) || 0
+    pastMonths: input.periodMonths,
+    pastDays: input.periodDays,
+    futureMonths: input.periodMonthsFuture,
+    futureDays: input.periodDaysFuture
   };
 }
 
-function hasPeriod(opts) {
-  return opts.pastMonths > 0 || opts.pastDays > 0 || opts.futureMonths > 0 || opts.futureDays > 0;
+function buildSelectedPeriodRange(input, dateExpression) {
+  if (input.periodMode === "manual") {
+    return buildManualDateRange(
+      dateExpression,
+      input.dateFrom,
+      input.dateTo
+    );
+  }
+
+  return buildRelativeDateRange(
+    periodSettings(input),
+    dateExpression
+  );
 }
 
-function dateExpr(alias, row) {
-  const col = row.internal || row.object;
-  const isDate = /_Date_Time$/i.test(col) || col === "_Date_Time" || /date|datetime/i.test(String(row.type || "").toLowerCase()) || /дата/i.test(String(row.type || ""));
-  return isDate ? `DATEADD(YEAR, -2000, ${alias}.[${col}])` : `${alias}.[${col}]`;
+function buildPeriodContext(
+  input,
+  selectedOrig,
+  periodField,
+  diagnostics
+) {
+  const preview = buildSelectedPeriodRange(
+    input,
+    "__DATE__"
+  );
+
+  const fieldAvailable =
+    !!periodField &&
+    selectedOrig.some(row => row.id === periodField.id) &&
+    isDateField(periodField);
+
+  (preview.diagnostics || []).forEach(message => {
+    diagnostics.push(message);
+  });
+
+  if (preview.description) {
+    diagnostics.push(preview.description);
+  }
+
+  if (
+    (preview.active || preview.requested) &&
+    !fieldAvailable
+  ) {
+    diagnostics.push(
+      !periodField
+        ? "Период не применён: поле периода не выбрано."
+        : "Период не применён: поле периода нельзя безопасно использовать в текущем контексте."
+    );
+  }
+
+  return {
+    input,
+    preview,
+    fieldAvailable
+  };
 }
 
-function addPeriodWhere(wheres, alias, row, opts) {
-  if (!row || !hasPeriod(opts)) return "";
-  const expr = dateExpr(alias, row);
-  if (opts.pastMonths > 0 || opts.pastDays > 0) wheres.push(`${expr} >= ${relativeDateBoundary(opts.pastMonths, opts.pastDays, "past")}`);
-  if (opts.futureMonths > 0 || opts.futureDays > 0) wheres.push(`${expr} <= ${relativeDateBoundary(opts.futureMonths, opts.futureDays, "future")}`);
-  return `${expr} DESC`;
-}
+function addPeriodWhere(
+  wheres,
+  alias,
+  row,
+  period
+) {
+  if (
+    !row ||
+    !period.fieldAvailable ||
+    !period.preview.active
+  ) {
+    return "";
+  }
 
+  const column = row.internal || row.object;
+  const expression = sqlDateExpr(
+    alias,
+    column,
+    row.type
+  );
+
+  const range = buildSelectedPeriodRange(
+    period.input,
+    expression
+  );
+
+  wheres.push(...range.conditions);
+  return `${expression} DESC`;
+}
 function createJoiner(qn, diagnostics, lines, aliasPrefix = "R") {
   const map = {};
   let next = 1;
+
   return (parentAlias, refInternal, targetTable) => {
     const key = `${parentAlias}.[${refInternal}]->${targetTable}`;
+
     if (map[key]) return map[key];
+
     const alias = `${aliasPrefix}${next++}`;
     map[key] = alias;
-    lines.push(`LEFT JOIN ${qn(targetTable)} AS ${alias} ON ${alias}.[_IDRRef] = ${parentAlias}.[${refInternal}]`);
-    diagnostics.push(`JOIN reference: ${parentAlias}.[${refInternal}] -> ${targetTable} AS ${alias}`);
+
+    lines.push(
+      `LEFT JOIN ${qn(targetTable)} AS ${alias} ON ${alias}.[_IDRRef] = ${parentAlias}.[${refInternal}]`
+    );
+
+    diagnostics.push(
+      `JOIN reference: ${parentAlias}.[${refInternal}] -> ${targetTable} AS ${alias}`
+    );
+
     return alias;
   };
 }
-
 export function generateSql(input) {
   const rows = input.rows || [];
   const byId = input.byId || {};
@@ -92,7 +169,12 @@ export function generateSql(input) {
   const schema = String(input.schema || "").trim();
   const qn = table => qname(db, schema, table);
   const periodField = input.periodFieldId ? byId[input.periodFieldId] || null : null;
-  const opts = periodOptions(input);
+  const period = buildPeriodContext(
+    input,
+    selectedOrig,
+    periodField,
+    diagnostics
+  );
 
   if (String(input.fromTable || "").trim()) {
     return buildExplicitFrom({
@@ -103,7 +185,7 @@ export function generateSql(input) {
       diagnostics,
       qn,
       periodField,
-      opts
+      period
     });
   }
 
@@ -117,7 +199,7 @@ export function generateSql(input) {
     diagnostics,
     qn,
     periodField,
-    opts,
+    period,
     relationMode: input.relationMode || "detail"
   });
 }
@@ -147,7 +229,7 @@ function buildExplicitFrom(ctx) {
     if (filter !== null && isBoolType(meta.field.type)) wheres.push(`${castExpr(currentAlias, col, meta.field.type)} = ${filter}`);
   });
 
-  const orderBy = addPeriodWhere(wheres, alias, ctx.periodField, ctx.opts);
+  const orderBy = addPeriodWhere(wheres, alias, ctx.periodField, ctx.period);
   const lines = ["SELECT", `  ${cols.join(",\n  ")}`, `FROM  ${ctx.qn(String(ctx.input.fromTable).trim())} AS ${alias}`];
   if (joins.length) lines.push(...joins);
   if (wheres.length) lines.push(`WHERE ${wheres.join(" AND ")}`);
@@ -283,11 +365,38 @@ function buildForBucket(ctx, bucket, baseTable, includeHeader) {
 
   lines.push(...joinLines);
 
-  if (ctx.periodField && hasPeriod(ctx.opts)) {
-    const periodTable = asTableName(tableFor(ctx.periodField, ctx.byId));
-    if (periodTable === baseTable || (header && periodTable === header)) {
-      const alias = header && periodTable === header ? H : T;
-      orderBy = addPeriodWhere(wheres, alias, ctx.periodField, ctx.opts);
+  if (
+    ctx.period.fieldAvailable &&
+    ctx.period.preview.active
+  ) {
+    const periodTable = asTableName(
+      tableFor(ctx.periodField, ctx.byId)
+    );
+
+    const belongsToSelect =
+      periodTable === baseTable ||
+      (
+        includeHeader &&
+        header &&
+        periodTable === header
+      );
+
+    if (belongsToSelect) {
+      const alias =
+        header && periodTable === header
+          ? H
+          : T;
+
+      orderBy = addPeriodWhere(
+        wheres,
+        alias,
+        ctx.periodField,
+        ctx.period
+      );
+    } else {
+      ctx.diagnostics.push(
+        `Период не применён к SELECT по ${baseTable}: поле даты принадлежит ${periodTable || "другой таблице"}.`
+      );
     }
   }
 

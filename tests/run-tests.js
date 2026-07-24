@@ -116,10 +116,127 @@ test("generateSql supports explicit FROM with bool and date filters", () => {
 
   assert.match(sql, /FROM  \[dbo\]\.\[_Document100\] AS F/);
   assert.match(sql, /CAST\(F\.\[_Posted\] AS int\) AS \[Posted\]/);
-  assert.match(sql, /WHERE CAST\(F\.\[_Posted\] AS int\) = 1 AND DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) >= DATEADD\(MONTH, -1, GETDATE\(\)\)/);
+  assert.match(
+    sql,
+    /DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) >= DATEADD\(MONTH, -1, CAST\(GETDATE\(\) AS date\)\)/
+  );
+  assert.match(
+    sql,
+    /DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) < DATEADD\(DAY, 1, CAST\(GETDATE\(\) AS date\)\)/
+  );
   assert.match(sql, /ORDER BY DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) DESC/);
 });
 
+test("generateSql applies inclusive manual date range", () => {
+  const dateRow = {
+    id: "1",
+    object: "Date",
+    title: "Date",
+    internal: "_Date_Time",
+    type: "datetime",
+    parentId: null
+  };
+
+  const result = generateSql({
+    rows: [dateRow],
+    byId: { "1": dateRow },
+    selected: { "1": true },
+    fromTable: "_Document100",
+    schema: "dbo",
+    periodFieldId: "1",
+    periodMode: "manual",
+    dateFrom: "2026-07-01",
+    dateTo: "2026-07-21"
+  });
+
+  assert.match(
+    result.sql,
+    /DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) >= CAST\('2026-07-01' AS date\)/
+  );
+  assert.match(
+    result.sql,
+    /DATEADD\(YEAR, -2000, F\.\[_Date_Time\]\) < DATEADD\(DAY, 1, CAST\('2026-07-21' AS date\)\)/
+  );
+  assert.match(result.sql, /ORDER BY .* DESC/);
+});
+
+test("generateSql rejects invalid manual date range", () => {
+  const dateRow = {
+    id: "1",
+    object: "Date",
+    title: "Date",
+    internal: "_Date_Time",
+    type: "datetime",
+    parentId: null
+  };
+
+  const result = generateSql({
+    rows: [dateRow],
+    byId: { "1": dateRow },
+    selected: { "1": true },
+    fromTable: "_Document100",
+    periodFieldId: "1",
+    periodMode: "manual",
+    dateFrom: "2026-02-30",
+    dateTo: "2026-03-01"
+  });
+
+  assert.doesNotMatch(result.sql, /\bWHERE\b/);
+  assert.doesNotMatch(result.sql, /\bORDER BY\b/);
+  assert.ok(
+    result.diagnostics.some(message =>
+      message.includes("Дата «с» некорректна")
+    )
+  );
+  assert.ok(
+    result.diagnostics.some(message =>
+      message.includes("намеренно не сформировано")
+    )
+  );
+});
+
+test("generateSql does not filter by an unselected period field", () => {
+  const rows = [
+    {
+      id: "1",
+      object: "Posted",
+      title: "Posted",
+      internal: "_Posted",
+      type: "boolean",
+      parentId: null
+    },
+    {
+      id: "2",
+      object: "Date",
+      title: "Date",
+      internal: "_Date_Time",
+      type: "datetime",
+      parentId: null
+    }
+  ];
+
+  const result = generateSql({
+    rows,
+    byId: {
+      "1": rows[0],
+      "2": rows[1]
+    },
+    selected: { "1": true },
+    fromTable: "_Document100",
+    periodFieldId: "2",
+    periodMonths: 1
+  });
+
+  assert.doesNotMatch(result.sql, /_Date_Time/);
+  assert.doesNotMatch(result.sql, /\bORDER BY\b/);
+  assert.ok(
+    result.diagnostics.some(message =>
+      message.includes(
+        "поле периода нельзя безопасно использовать"
+      )
+    )
+  );
+});
 test("generateSql detects VT table and joins document header in flat mode", () => {
   const rows = [
     { id: "1", object: "Doc", internal: "_Document100", parentId: null },
