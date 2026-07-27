@@ -1,5 +1,6 @@
 import { castExpr } from "./casts.js";
 import { buildManualDateRange, buildRelativeDateRange, sqlDateExpr } from "./dates.js";
+import { resolveTablePartHeaderJoin } from "./relationships.js";
 import { getDocPrefix, isVTTableName, tableFor } from "./tableDetect.js";
 import { isBoolType, isDateField } from "./types.js";
 
@@ -356,9 +357,83 @@ function buildForBucket(ctx, bucket, baseTable, includeHeader) {
     lines.push(`FROM  ${ctx.qn(header)} AS ${H}`);
   } else if (needJoinHeader) {
     lines.push(`FROM  ${ctx.qn(baseTable)} AS ${T}`);
-    const joinCol = findHeaderJoinColumn(ctx.rows, ctx.byId, baseTable, bucket.prefix, header);
-    lines.push(`LEFT JOIN ${ctx.qn(header)} AS ${H} ON ${T}.[${joinCol}] = ${H}.[_IDRRef]`);
-    ctx.diagnostics.push(`JOIN header: ${baseTable}.${joinCol} -> ${header}._IDRRef`);
+
+    const resolution = resolveTablePartHeaderJoin(
+      baseTable,
+      {
+        rows: ctx.rows,
+        expectedHeaderTable: header
+      }
+    );
+
+    if (!resolution.matched || !resolution.unambiguous) {
+      (resolution.diagnostics || []).forEach(message => {
+        ctx.diagnostics.push(message);
+      });
+
+      (resolution.candidates || []).forEach(candidate => {
+        const label =
+          `${candidate.detailTable || "<неизвестная таблица>"}.` +
+          `${candidate.detailForeignKeyColumn || "<неизвестная колонка>"} -> ` +
+          `${candidate.headerTable || "<неизвестная таблица>"}.` +
+          `${candidate.headerKeyColumn || "<неизвестная колонка>"}`;
+
+        ctx.diagnostics.push(`Кандидат связи: ${label}.`);
+      });
+
+      return null;
+    }
+
+    const matchingCandidates = (resolution.candidates || []).filter(candidate =>
+      candidate &&
+      candidate.detailTable === resolution.detailTable &&
+      candidate.detailForeignKeyColumn === resolution.detailForeignKeyColumn &&
+      candidate.headerTable === resolution.headerTable &&
+      candidate.headerKeyColumn === resolution.headerKeyColumn
+    );
+
+    const explicitCandidate =
+      matchingCandidates.length === 1 &&
+      matchingCandidates[0].confirmation === "explicit_columns"
+        ? matchingCandidates[0]
+        : null;
+
+    if (!explicitCandidate) {
+      (resolution.diagnostics || []).forEach(message => {
+        ctx.diagnostics.push(message);
+      });
+
+      (resolution.candidates || []).forEach(candidate => {
+        const label =
+          `${candidate.detailTable || "<unknown table>"}.` +
+          `${candidate.detailForeignKeyColumn || "<unknown column>"} -> ` +
+          `${candidate.headerTable || "<unknown table>"}.` +
+          `${candidate.headerKeyColumn || "<unknown column>"}`;
+
+        ctx.diagnostics.push(
+          `Header/detail candidate: ${label}; ` +
+          `confirmation=${candidate.confirmation || "<none>"}.`
+        );
+      });
+
+      ctx.diagnostics.push(
+        "The table-part/header relationship was found structurally, " +
+        "but the physical detail foreign key column was not confirmed."
+      );
+
+      return null;
+    }
+    lines.push(
+      `LEFT JOIN ${ctx.qn(resolution.headerTable)} AS ${H} ` +
+      `ON ${T}.[${resolution.detailForeignKeyColumn}] = ` +
+      `${H}.[${resolution.headerKeyColumn}]`
+    );
+
+    ctx.diagnostics.push(
+      `JOIN header: ` +
+      `${resolution.detailTable}.${resolution.detailForeignKeyColumn} -> ` +
+      `${resolution.headerTable}.${resolution.headerKeyColumn}`
+    );
   } else {
     lines.push(`FROM  ${ctx.qn(baseTable)} AS ${T}`);
   }
@@ -405,20 +480,6 @@ function buildForBucket(ctx, bucket, baseTable, includeHeader) {
   return lines.join("\n");
 }
 
-function findHeaderJoinColumn(rows, byId, baseTable, prefix, header) {
-  const internals = new Set(rows
-    .filter(row => asTableName(tableFor(row, byId)) === baseTable)
-    .map(row => String(row.internal || row.object || "").toLowerCase()));
-  const candidates = [
-    `${prefix}_IDRRef`,
-    `${String(prefix || "").replace(/X\d+$/i, "")}_IDRRef`,
-    `${String(header || "").replace(/X\d+$/i, "")}_IDRRef`,
-    `${String(header || "").replace(/.*\./, "")}_IDRRef`
-  ].filter(Boolean);
-  const lowered = candidates.map(item => String(item).toLowerCase());
-  const found = lowered.find(item => internals.has(item));
-  return candidates[lowered.indexOf(found)] || candidates[0];
-}
 
 function addRelationshipDiagnostics(ctx) {
   const selectedTables = new Set();

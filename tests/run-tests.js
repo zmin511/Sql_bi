@@ -239,11 +239,50 @@ test("generateSql does not filter by an unselected period field", () => {
 });
 test("generateSql detects VT table and joins document header in flat mode", () => {
   const rows = [
-    { id: "1", object: "Doc", internal: "_Document100", parentId: null },
-    { id: "2", object: "Number", title: "Number", internal: "_Number", type: "string", parentId: "1" },
-    { id: "3", object: "Items", internal: "_Document100_VT200", parentId: "1" },
-    { id: "4", object: "DocRef", internal: "_Document100_IDRRef", type: "uuid", parentId: "3" },
-    { id: "5", object: "Qty", title: "Qty", internal: "_Fld300", type: "int", parentId: "3" }
+    {
+      id: "1",
+      object: "Doc",
+      internal: "_Document100",
+      parentId: null,
+      metadata: "Документ.Заказ"
+    },
+    {
+      id: "2",
+      object: "Number",
+      title: "Number",
+      internal: "_Number",
+      type: "string",
+      parentId: "1"
+    },
+    {
+      id: "3",
+      object: "Items",
+      internal: "_Document100_VT200",
+      parentId: "1",
+      metadata: "Документ.Заказ"
+    },
+    {
+      id: "4",
+      object: "DocRef",
+      internal: "_Document100_IDRRef",
+      type: "uuid",
+      parentId: "3"
+    },
+    {
+      id: "5",
+      object: "Qty",
+      title: "Qty",
+      internal: "_Fld300",
+      type: "int",
+      parentId: "3"
+    },
+    {
+      id: "6",
+      object: "Ref",
+      internal: "_IDRRef",
+      type: "uuid",
+      parentId: "1"
+    }
   ];
   const { byId } = buildTree(rows);
   const result = generateSql({
@@ -262,6 +301,135 @@ test("generateSql detects VT table and joins document header in flat mode", () =
   assert.ok(result.diagnostics.some(item => item.includes("JOIN header")));
 });
 
+test("generateSql fails closed when the detail foreign key is only structural", () => {
+  const rows = [
+    {
+      id: "1",
+      object: "Document",
+      internal: "_Document100",
+      parentId: null,
+      metadata: "Document.Order"
+    },
+    {
+      id: "2",
+      object: "Number",
+      title: "Number",
+      internal: "_Number",
+      type: "string",
+      parentId: "1"
+    },
+    {
+      id: "3",
+      object: "Items",
+      internal: "_Document100_VT1",
+      parentId: "1",
+      metadata: "Document.Order"
+    },
+    {
+      id: "4",
+      object: "Quantity",
+      title: "Quantity",
+      internal: "_Fld300",
+      type: "int",
+      parentId: "3"
+    },
+    {
+      id: "5",
+      object: "HeaderRef",
+      internal: "_IDRRef",
+      type: "uuid",
+      parentId: "1"
+    }
+  ];
+
+  const { byId } = buildTree(rows);
+  const result = generateSql({
+    rows,
+    byId,
+    selected: { "2": true, "4": true },
+    flatten: { "_document100_vt1": true },
+    schema: "dbo",
+    relationMode: "detail"
+  });
+
+  assert.equal(result.sql.trim(), "");
+  assert.doesNotMatch(result.sql, /LEFT JOIN/);
+  assert.doesNotMatch(result.sql, /T\.\[_Document100_IDRRef\]/);
+  assert.ok(
+    result.diagnostics.some(message =>
+      message.includes(
+        "physical detail foreign key column was not confirmed"
+      )
+    )
+  );
+});
+
+test("generateSql keeps detail-only SELECT when the header join is not required", () => {
+  const rows = [
+    {
+      id: "1",
+      object: "Document",
+      internal: "_Document100",
+      parentId: null,
+      metadata: "Document.Order"
+    },
+    {
+      id: "2",
+      object: "Items",
+      internal: "_Document100_VT1",
+      parentId: "1",
+      metadata: "Document.Order"
+    },
+    {
+      id: "3",
+      object: "Quantity",
+      title: "Quantity",
+      internal: "_Fld300",
+      type: "int",
+      parentId: "2"
+    },
+    {
+      id: "4",
+      object: "HeaderRef",
+      internal: "_IDRRef",
+      type: "uuid",
+      parentId: "1"
+    }
+  ];
+
+  const { byId } = buildTree(rows);
+  const result = generateSql({
+    rows,
+    byId,
+    selected: { "3": true },
+    schema: "dbo",
+    relationMode: "detail"
+  });
+
+  const fromMatch = result.sql.match(
+    /FROM  \[dbo\]\.\[_Document100_VT1\] AS ([HT])/
+  );
+
+  assert.ok(fromMatch);
+  const detailAlias = fromMatch[1];
+
+  assert.match(
+    result.sql,
+    new RegExp(
+      `CAST\\(${detailAlias}\\.\\[_Fld300\\] AS int\\) AS \\[Quantity\\]`
+    )
+  );
+  assert.doesNotMatch(result.sql, /LEFT JOIN/);
+  assert.doesNotMatch(result.sql, /_Document100_IDRRef/);
+  assert.equal(
+    result.diagnostics.some(message =>
+      message.includes(
+        "physical detail foreign key column was not confirmed"
+      )
+    ),
+    false
+  );
+});
 test("project snapshot round-trips structure, selection, and query settings", () => {
   const rows = [
     { id: "1", object: "Document", internal: "_Document100", parentId: null },
