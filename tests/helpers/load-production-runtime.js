@@ -153,7 +153,10 @@ export function loadProductionRuntime(indexPath = "index.html") {
     `${diagnosticApiMarker}
       normalizeHeader, rowsFromTableObjects, importRows, tableFor,
       qualifiedColumn, stableAliasHash, fitColumnAlias,
-      makeUniqueColumnAlias, outputAliasBase,`
+      makeUniqueColumnAlias, outputAliasBase,
+      referenceTypeParts, referenceRootMask, resolveReferenceTarget,
+      validateJoinChain, chainHasTarget, chainText, synthId,
+      setReferenceDepthForTest: value => { state.refDepth = value; },`
   );
 
   const { sandbox, elements } = createBrowserSandbox();
