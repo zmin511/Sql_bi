@@ -151,7 +151,9 @@ export function loadProductionRuntime(indexPath = "index.html") {
   source = source.replace(
     diagnosticApiMarker,
     `${diagnosticApiMarker}
-      normalizeHeader, rowsFromTableObjects, importRows, tableFor,`
+      normalizeHeader, rowsFromTableObjects, importRows, tableFor,
+      qualifiedColumn, stableAliasHash, fitColumnAlias,
+      makeUniqueColumnAlias, outputAliasBase,`
   );
 
   const { sandbox, elements } = createBrowserSandbox();
