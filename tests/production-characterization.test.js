@@ -1,3 +1,7 @@
+﻿import {
+  selectionContextScenarios,
+  stableSelectionContextResult
+} from "./helpers/selection-context-fixtures.js";
 import assert from "node:assert/strict";
 import { loadProductionRuntime } from "./helpers/load-production-runtime.js";
 
@@ -628,6 +632,139 @@ for (const scenario of tablePartCharacterizationCases) {
       `production relationship: ${scenario.name}: ${JSON.stringify(shape)}`
     );
   });
+}
+
+
+// STEP02K_SELECTION_CONTEXT_CHARACTERIZATION
+const selectionContextCharacterizationCases =
+  selectionContextScenarios();
+
+for (const scenario of selectionContextCharacterizationCases) {
+  test(
+    `production selection context: ${scenario.name}`,
+    () => {
+      const result = api.resolveSelectionContext(
+        scenario.selectedFields,
+        scenario.context
+      );
+
+      const shape = stableSelectionContextResult(result);
+      const expected = scenario.expected;
+
+      const expectedKeys = [
+        "matched",
+        "valid",
+        "mode",
+        "baseObject",
+        "basePhysicalTable",
+        "headerObject",
+        "detailObject",
+        "allowedObjectIds",
+        "allowedPhysicalTables",
+        "rejectedFields",
+        "relationships",
+        "reason",
+        "diagnostics",
+        "fields"
+      ];
+
+      assert.deepEqual(
+        Object.keys(shape),
+        expectedKeys
+      );
+
+      assert.equal(shape.matched, expected.matched);
+      assert.equal(shape.valid, expected.valid);
+      assert.equal(shape.mode, expected.mode);
+      assert.equal(shape.reason, expected.reason);
+
+      if (
+        Object.hasOwn(
+          expected,
+          "basePhysicalTable"
+        )
+      ) {
+        assert.equal(
+          shape.basePhysicalTable,
+          expected.basePhysicalTable
+        );
+      }
+
+      if (expected.allowedObjectIds) {
+        assert.deepEqual(
+          shape.allowedObjectIds,
+          expected.allowedObjectIds
+        );
+      }
+
+      if (expected.allowedPhysicalTables) {
+        assert.deepEqual(
+          shape.allowedPhysicalTables,
+          expected.allowedPhysicalTables
+        );
+      }
+
+      if (
+        Object.hasOwn(expected, "rejectedCount")
+      ) {
+        assert.equal(
+          shape.rejectedFields.length,
+          expected.rejectedCount
+        );
+      }
+
+      if (
+        Object.hasOwn(expected, "fieldCount")
+      ) {
+        assert.equal(
+          shape.fields.length,
+          expected.fieldCount
+        );
+      }
+
+      if (expected.fieldRole) {
+        assert.equal(
+          shape.fields[0] && shape.fields[0].role,
+          expected.fieldRole
+        );
+      }
+
+      if (expected.physicalKey) {
+        assert.equal(
+          shape.fields[0] &&
+            shape.fields[0].physicalKey,
+          expected.physicalKey
+        );
+      }
+
+      if (expected.orderedFieldIds) {
+        assert.deepEqual(
+          shape.fields.map(item => item.fieldId),
+          expected.orderedFieldIds
+        );
+      }
+
+      if (expected.relationshipConfirmation) {
+        assert.equal(
+          shape.relationships[0] &&
+            shape.relationships[0].candidates &&
+            shape.relationships[0].candidates[0] &&
+            shape.relationships[0].candidates[0]
+              .confirmation,
+          expected.relationshipConfirmation
+        );
+      }
+
+      assert.ok(Array.isArray(shape.diagnostics));
+      assert.ok(Array.isArray(shape.fields));
+      assert.ok(Array.isArray(shape.relationships));
+      assert.ok(Array.isArray(shape.rejectedFields));
+
+      console.log(
+        `production selection context: ${scenario.name}: ${JSON.stringify(shape)}`
+      );
+    }
+  );
 }
 
 let passed = 0;
