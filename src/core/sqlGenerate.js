@@ -1,7 +1,8 @@
 import { castExpr } from "./casts.js";
 import { buildManualDateRange, buildRelativeDateRange, sqlDateExpr } from "./dates.js";
-import { resolveTablePartHeaderJoin } from "./relationships.js";
-import { getDocPrefix, isVTTableName, tableFor } from "./tableDetect.js";
+import { validateRelationshipForSql } from "./relationships.js";
+import { resolveSelectionContext } from "./selectionContext.js";
+import { tableFor } from "./tableDetect.js";
 import { isBoolType, isDateField } from "./types.js";
 
 export function qname(db, schema, table) {
@@ -13,10 +14,8 @@ export function qname(db, schema, table) {
 export function boolFilterValueForId(id, boolFilters = {}) {
   const item = boolFilters[id];
   if (!item) return null;
-  const yes = !!item.yes;
-  const no = !!item.no;
-  if (yes && !no) return 1;
-  if (no && !yes) return 0;
+  if (!!item.yes && !item.no) return 1;
+  if (!!item.no && !item.yes) return 0;
   return null;
 }
 
@@ -28,477 +27,193 @@ function asTableName(row) {
   return String((row && (row.internal || row.object)) || "");
 }
 
-function periodSettings(input) {
-  return {
-    pastMonths: input.periodMonths,
-    pastDays: input.periodDays,
-    futureMonths: input.periodMonthsFuture,
-    futureDays: input.periodDaysFuture
-  };
+function buildSelectedPeriodRange(input, expression) {
+  return input.periodMode === "manual"
+    ? buildManualDateRange(expression, input.dateFrom, input.dateTo)
+    : buildRelativeDateRange({
+      pastMonths: input.periodMonths,
+      pastDays: input.periodDays,
+      futureMonths: input.periodMonthsFuture,
+      futureDays: input.periodDaysFuture
+    }, expression);
 }
 
-function buildSelectedPeriodRange(input, dateExpression) {
-  if (input.periodMode === "manual") {
-    return buildManualDateRange(
-      dateExpression,
-      input.dateFrom,
-      input.dateTo
-    );
-  }
-
-  return buildRelativeDateRange(
-    periodSettings(input),
-    dateExpression
-  );
-}
-
-function buildPeriodContext(
-  input,
-  selectedOrig,
-  periodField,
-  diagnostics
-) {
-  const preview = buildSelectedPeriodRange(
-    input,
-    "__DATE__"
-  );
-
-  const fieldAvailable =
-    !!periodField &&
+function buildPeriodContext(input, selectedOrig, periodField, diagnostics) {
+  const preview = buildSelectedPeriodRange(input, "__DATE__");
+  const fieldAvailable = !!periodField &&
     selectedOrig.some(row => row.id === periodField.id) &&
     isDateField(periodField);
-
-  (preview.diagnostics || []).forEach(message => {
-    diagnostics.push(message);
-  });
-
-  if (preview.description) {
-    diagnostics.push(preview.description);
+  diagnostics.push(...(preview.diagnostics || []));
+  if (preview.description) diagnostics.push(preview.description);
+  if ((preview.active || preview.requested) && !fieldAvailable) {
+    diagnostics.push(!periodField
+      ? "Период не применён: поле периода не выбрано."
+      : "Период не применён: поле периода нельзя безопасно использовать в текущем контексте.");
   }
-
-  if (
-    (preview.active || preview.requested) &&
-    !fieldAvailable
-  ) {
-    diagnostics.push(
-      !periodField
-        ? "Период не применён: поле периода не выбрано."
-        : "Период не применён: поле периода нельзя безопасно использовать в текущем контексте."
-    );
-  }
-
-  return {
-    input,
-    preview,
-    fieldAvailable
-  };
+  return { input, preview, fieldAvailable };
 }
 
-function addPeriodWhere(
-  wheres,
-  alias,
-  row,
-  period
-) {
-  if (
-    !row ||
-    !period.fieldAvailable ||
-    !period.preview.active
-  ) {
-    return "";
-  }
-
-  const column = row.internal || row.object;
-  const expression = sqlDateExpr(
-    alias,
-    column,
-    row.type
-  );
-
-  const range = buildSelectedPeriodRange(
-    period.input,
-    expression
-  );
-
-  wheres.push(...range.conditions);
+function addPeriodWhere(wheres, alias, row, period) {
+  if (!row || !period.fieldAvailable || !period.preview.active) return "";
+  const expression = sqlDateExpr(alias, row.internal || row.object, row.type);
+  wheres.push(...buildSelectedPeriodRange(period.input, expression).conditions);
   return `${expression} DESC`;
 }
-function createJoiner(qn, diagnostics, lines, aliasPrefix = "R") {
-  const map = {};
-  let next = 1;
 
+function createJoiner(qn, diagnostics, lines) {
+  const aliases = {};
+  let next = 1;
   return (parentAlias, refInternal, targetTable) => {
     const key = `${parentAlias}.[${refInternal}]->${targetTable}`;
-
-    if (map[key]) return map[key];
-
-    const alias = `${aliasPrefix}${next++}`;
-    map[key] = alias;
-
-    lines.push(
-      `LEFT JOIN ${qn(targetTable)} AS ${alias} ON ${alias}.[_IDRRef] = ${parentAlias}.[${refInternal}]`
-    );
-
-    diagnostics.push(
-      `JOIN reference: ${parentAlias}.[${refInternal}] -> ${targetTable} AS ${alias}`
-    );
-
+    if (aliases[key]) return aliases[key];
+    const alias = `R${next++}`;
+    aliases[key] = alias;
+    lines.push(`LEFT JOIN ${qn(targetTable)} AS ${alias} ON ${alias}.[_IDRRef] = ${parentAlias}.[${refInternal}]`);
+    diagnostics.push(`JOIN reference: ${parentAlias}.[${refInternal}] -> ${targetTable} AS ${alias}`);
     return alias;
   };
 }
+
+function childrenFor(rows, inputChildren) {
+  if (inputChildren) return inputChildren;
+  return rows.reduce((children, row) => {
+    if (row && row.parentId != null) {
+      if (!children[row.parentId]) children[row.parentId] = [];
+      children[row.parentId].push(row);
+    }
+    return children;
+  }, {});
+}
+
+function validIdentifierPart(value) {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || ""));
+}
+
+function manualTableName(value, db, schema) {
+  const parts = String(value || "").trim().split(".");
+  if (!parts.length || parts.some(part => !validIdentifierPart(part))) return null;
+  if (parts.length === 1) return qname(db, schema, parts[0]);
+  if (parts.length === 2) return qname("", parts[0], parts[1]);
+  if (parts.length === 3) return qname(parts[0], parts[1], parts[2]);
+  return null;
+}
+
 export function generateSql(input) {
   const rows = input.rows || [];
   const byId = input.byId || {};
   const selected = input.selected || {};
   const metaById = input.metaById || {};
-  const boolFilters = input.boolFilters || {};
-  const flatten = input.flatten || {};
-  const diagnostics = [];
   const selectedIds = Object.keys(selected).filter(id => selected[id]);
-
   if (!selectedIds.length) {
     return { sql: "-- Select at least one field", diagnostics: [], hint: "" };
   }
 
   const selectedOrig = selectedIds.filter(id => byId[id]).map(id => byId[id]);
-  const selectedSynth = selectedIds
-    .filter(id => !byId[id])
+  const selectedSynth = selectedIds.filter(id => !byId[id])
     .map(id => ({ id, ...(metaById[id] || {}) }))
     .filter(item => item && item.field);
-
+  const diagnostics = [];
   const db = String(input.dbName || "").trim();
   const schema = String(input.schema || "").trim();
-  const qn = table => qname(db, schema, table);
-  const periodField = input.periodFieldId ? byId[input.periodFieldId] || null : null;
-  const period = buildPeriodContext(
-    input,
-    selectedOrig,
-    periodField,
-    diagnostics
-  );
+  const selectionContext = resolveSelectionContext([
+    ...selectedOrig.map(row => ({ kind: "orig", id: row.id, row })),
+    ...selectedSynth.map(meta => ({ kind: "synth", id: meta.id, row: meta.field, meta }))
+  ], {
+    database: db,
+    schema,
+    manualFrom: input.fromTable,
+    byId,
+    rows,
+    children: childrenFor(rows, input.children),
+    tableFor: row => tableFor(row, byId),
+    resolveTablePartHeaderJoin: input.resolveTablePartHeaderJoin
+  });
 
-  if (String(input.fromTable || "").trim()) {
-    return buildExplicitFrom({
-      input,
-      selectedOrig,
-      selectedSynth,
-      boolFilters,
-      diagnostics,
-      qn,
-      periodField,
-      period
-    });
+  if (!selectionContext.valid) {
+    diagnostics.push(...(selectionContext.diagnostics || []));
+    if (!diagnostics.length) diagnostics.push(`Выбор полей заблокирован: ${selectionContext.reason || "unknown_selection_context"}.`);
+    return { sql: "", diagnostics, hint: "SQL не сформирован: выбор полей не подтверждён." };
   }
 
-  return buildDetectedFrom({
-    rows,
-    byId,
-    selectedOrig,
-    selectedSynth,
-    boolFilters,
-    flatten,
-    diagnostics,
-    qn,
-    periodField,
-    period,
-    relationMode: input.relationMode || "detail"
+  const periodField = input.periodFieldId ? byId[input.periodFieldId] || null : null;
+  const period = buildPeriodContext(input, selectedOrig, periodField, diagnostics);
+  const context = {
+    input, rows, byId, selectedOrig, selectedSynth,
+    boolFilters: input.boolFilters || {}, diagnostics,
+    qn: table => qname(db, schema, table), periodField, period, selectionContext, db, schema
+  };
+  return selectionContext.mode === "manual"
+    ? buildExplicitFrom(context)
+    : buildResolvedFrom(context);
+}
+
+function addColumns(ctx, baseTable, header, aliases, cols, wheres, ensureJoin) {
+  const add = (row, meta, tableName) => {
+    if (baseTable && tableName !== baseTable && tableName !== header) return;
+    let alias = header && tableName === header ? aliases.header : aliases.base;
+    if (meta) {
+      for (const step of meta.chain || []) alias = ensureJoin(alias, step.refInternal, step.targetTable);
+    }
+    const field = meta ? meta.field : row;
+    const col = field.internal || field.object;
+    cols.push(`${castExpr(alias, col, field.type)} AS [${meta ? meta.displayPath : field.title || field.object}]`);
+    const filter = boolFilterValueForId(meta ? meta.id : row.id, ctx.boolFilters);
+    if (filter !== null && isBoolType(field.type)) wheres.push(`${castExpr(alias, col, field.type)} = ${filter}`);
+  };
+  ctx.selectedOrig.forEach(row => add(row, null, asTableName(tableFor(row, ctx.byId))));
+  ctx.selectedSynth.forEach(meta => {
+    const baseTop = ctx.byId[meta.baseTopId];
+    if (baseTop) add(null, meta, asTableName(tableFor(baseTop, ctx.byId)));
   });
 }
 
 function buildExplicitFrom(ctx) {
-  const alias = "F";
-  const joins = [];
-  const cols = [];
-  const wheres = [];
-  const ensureJoin = createJoiner(ctx.qn, ctx.diagnostics, joins);
-
-  ctx.selectedOrig.forEach(row => {
-    const col = row.internal || row.object;
-    cols.push(`${castExpr(alias, col, row.type)} AS [${row.title || row.object}]`);
-    const filter = boolFilterValueForId(row.id, ctx.boolFilters);
-    if (filter !== null && isBoolType(row.type)) wheres.push(`${castExpr(alias, col, row.type)} = ${filter}`);
-  });
-
-  ctx.selectedSynth.forEach(meta => {
-    let currentAlias = alias;
-    (meta.chain || []).forEach(step => {
-      currentAlias = ensureJoin(currentAlias, step.refInternal, step.targetTable);
-    });
-    const col = meta.field.internal || meta.field.object;
-    cols.push(`${castExpr(currentAlias, col, meta.field.type)} AS [${meta.displayPath}]`);
-    const filter = boolFilterValueForId(meta.id, ctx.boolFilters);
-    if (filter !== null && isBoolType(meta.field.type)) wheres.push(`${castExpr(currentAlias, col, meta.field.type)} = ${filter}`);
-  });
-
-  const orderBy = addPeriodWhere(wheres, alias, ctx.periodField, ctx.period);
-  const lines = ["SELECT", `  ${cols.join(",\n  ")}`, `FROM  ${ctx.qn(String(ctx.input.fromTable).trim())} AS ${alias}`];
+  const tableName = manualTableName(ctx.selectionContext.basePhysicalTable, ctx.db, ctx.schema);
+  if (!tableName) {
+    ctx.diagnostics.push("Ручной FROM не имеет допустимого SQL-идентификатора. SQL намеренно не сформирован.");
+    return { sql: "", diagnostics: ctx.diagnostics, hint: "SQL не сформирован." };
+  }
+  const joins = [], cols = [], wheres = [];
+  addColumns(ctx, null, null, { base: "F", header: "F" }, cols, wheres, createJoiner(ctx.qn, ctx.diagnostics, joins));
+  if (!cols.length) return { sql: "", diagnostics: [...ctx.diagnostics, "SELECT не сформирован: нет выбранных колонок."], hint: "SQL не сформирован." };
+  const orderBy = addPeriodWhere(wheres, "F", ctx.periodField, ctx.period);
+  const lines = ["SELECT", `  ${cols.join(",\n  ")}`, `FROM  ${tableName} AS F`];
   if (joins.length) lines.push(...joins);
   if (wheres.length) lines.push(`WHERE ${wheres.join(" AND ")}`);
   if (orderBy) lines.push(`ORDER BY ${orderBy}`);
   return { sql: lines.join("\n"), diagnostics: ctx.diagnostics, hint: "" };
 }
 
-function buildDetectedFrom(ctx) {
-  const buckets = new Map();
-  const addToBucket = (baseRow, origRow, synthMeta) => {
-    const tableNode = tableFor(baseRow, ctx.byId);
-    const table = asTableName(tableNode);
-    const prefix = getDocPrefix(table);
-    const key = prefix || table || "__unknown__";
-    const bucket = buckets.get(key) || { origRows: [], synthRows: [], tables: new Set(), prefix };
-    if (origRow) bucket.origRows.push(origRow);
-    if (synthMeta) bucket.synthRows.push(synthMeta);
-    if (table) bucket.tables.add(table);
-    buckets.set(key, bucket);
-  };
-
-  ctx.selectedOrig.forEach(row => addToBucket(row, row, null));
-  ctx.selectedSynth.forEach(meta => {
-    const baseTop = ctx.byId[meta.baseTopId];
-    if (baseTop) addToBucket(baseTop, null, meta);
-  });
-
-  if (buckets.size === 1 && buckets.has("__unknown__")) {
-    return {
-      sql: "-- Specify FROM table in query settings.",
-      diagnostics: ["Table for selected fields was not detected automatically."],
-      hint: "Specify FROM table to generate SQL exactly."
-    };
+function buildResolvedFrom(ctx) {
+  let relationship = null;
+  if (ctx.selectionContext.mode === "header_detail") {
+    const policy = validateRelationshipForSql(ctx.selectionContext.relationships[0]);
+    ctx.diagnostics.push(...policy.diagnostics);
+    if (!policy.valid) return { sql: "", diagnostics: ctx.diagnostics, hint: "SQL не сформирован: physical JOIN не подтверждён." };
+    relationship = policy.candidate;
   }
-
-  const parts = [];
-  for (const bucket of buckets.values()) {
-    const tables = Array.from(bucket.tables);
-    const header = findHeaderTable(bucket.prefix, tables);
-    const rest = tables.filter(table => table !== header);
-    const headerSelected = !!header && bucketHasHeaderSelection(bucket, header, ctx.byId);
-
-    if (tables.length === 1) {
-      ctx.diagnostics.push(`Base table: ${tables[0]}`);
-      parts.push(buildForBucket(ctx, bucket, tables[0], false));
-    } else if (header) {
-      const anyFlatVT = rest.some(table => isVTTableName(table) && !!ctx.flatten[String(table).toLowerCase()] && headerSelected);
-      rest.forEach(table => {
-        const includeHeader = headerSelected && isVTTableName(table) && !!ctx.flatten[String(table).toLowerCase()];
-        ctx.diagnostics.push(includeHeader ? `Flat table: ${table} + header ${header}` : `Table separately: ${table}`);
-        parts.push(buildForBucket(ctx, bucket, table, includeHeader));
-      });
-      if (headerSelected && !anyFlatVT) {
-        ctx.diagnostics.push(`Header fields moved to separate SELECT: ${header}`);
-        parts.push(buildForBucket(ctx, bucket, header, false));
-      }
-    } else {
-      if (tables.length > 1) ctx.diagnostics.push(`Several tables in one group: ${tables.join(", ")}`);
-      tables.forEach(table => {
-        ctx.diagnostics.push(`Base table: ${table}`);
-        parts.push(buildForBucket(ctx, bucket, table, false));
-      });
-    }
+  const baseTable = relationship ? relationship.detailTable : ctx.selectionContext.basePhysicalTable;
+  const header = relationship ? relationship.headerTable : null;
+  const joins = [], cols = [], wheres = [];
+  addColumns(ctx, baseTable, header, { base: "T", header: "H" }, cols, wheres, createJoiner(ctx.qn, ctx.diagnostics, joins));
+  if (!cols.length) return { sql: "", diagnostics: [...ctx.diagnostics, "SELECT не сформирован: нет выбранных колонок."], hint: "SQL не сформирован." };
+  const lines = ["SELECT", `  ${cols.join(",\n  ")}`, `FROM  ${ctx.qn(baseTable)} AS T`];
+  if (relationship) {
+    lines.push(`LEFT JOIN ${ctx.qn(relationship.headerTable)} AS H ON T.[${relationship.detailForeignKeyColumn}] = H.[${relationship.headerKeyColumn}]`);
+    ctx.diagnostics.push(`JOIN header: ${relationship.detailTable}.${relationship.detailForeignKeyColumn} -> ${relationship.headerTable}.${relationship.headerKeyColumn}`);
   }
-
-  addRelationshipDiagnostics(ctx);
-  return { sql: parts.join("\n\n-- ##############################################################\n\n"), diagnostics: ctx.diagnostics, hint: "" };
-}
-
-function findHeaderTable(prefix, tables) {
-  if (!prefix) return null;
-  return tables.find(table => !isVTTableName(table) && String(getDocPrefix(table) || "").toLowerCase() === String(prefix).toLowerCase())
-    || tables.find(table => String(getDocPrefix(table) || "").toLowerCase() === String(prefix).toLowerCase())
-    || null;
-}
-
-function bucketHasHeaderSelection(bucket, header, byId) {
-  return bucket.origRows.some(row => asTableName(tableFor(row, byId)) === header)
-    || bucket.synthRows.some(meta => {
-      const baseTop = byId[meta.baseTopId];
-      return baseTop && asTableName(tableFor(baseTop, byId)) === header;
-    });
-}
-
-function buildForBucket(ctx, bucket, baseTable, includeHeader) {
-  const H = "H";
-  const T = "T";
-  const tables = Array.from(bucket.tables);
-  const header = findHeaderTable(bucket.prefix, tables);
-  const needJoinHeader = includeHeader && header && baseTable !== header;
-  const joinLines = [];
-  const ensureJoin = createJoiner(ctx.qn, ctx.diagnostics, joinLines);
-  const cols = [];
-  const wheres = [];
-  let orderBy = "";
-
-  bucket.origRows.forEach(row => {
-    const tableName = asTableName(tableFor(row, ctx.byId));
-    const inThis = baseTable === header ? tableName === header : tableName === baseTable || (includeHeader && header && tableName === header);
-    if (!inThis) return;
-    const alias = header && tableName === header ? H : T;
-    const col = row.internal || row.object;
-    cols.push(`${castExpr(alias, col, row.type)} AS [${row.title || row.object}]`);
-    const filter = boolFilterValueForId(row.id, ctx.boolFilters);
-    if (filter !== null && isBoolType(row.type)) wheres.push(`${castExpr(alias, col, row.type)} = ${filter}`);
-  });
-
-  bucket.synthRows.forEach(meta => {
-    const baseTop = ctx.byId[meta.baseTopId];
-    if (!baseTop) return;
-    const baseTopTable = asTableName(tableFor(baseTop, ctx.byId));
-    const inThis = baseTable === header ? baseTopTable === header : baseTopTable === baseTable || (includeHeader && header && baseTopTable === header);
-    if (!inThis) return;
-    let currentAlias = header && baseTopTable === header ? H : T;
-    (meta.chain || []).forEach(step => {
-      currentAlias = ensureJoin(currentAlias, step.refInternal, step.targetTable);
-    });
-    const col = meta.field.internal || meta.field.object;
-    cols.push(`${castExpr(currentAlias, col, meta.field.type)} AS [${meta.displayPath}]`);
-  });
-
-  const lines = ["SELECT", `  ${cols.join(",\n  ")}`];
-  if (baseTable === header) {
-    lines.push(`FROM  ${ctx.qn(header)} AS ${H}`);
-  } else if (needJoinHeader) {
-    lines.push(`FROM  ${ctx.qn(baseTable)} AS ${T}`);
-
-    const resolution = resolveTablePartHeaderJoin(
-      baseTable,
-      {
-        rows: ctx.rows,
-        expectedHeaderTable: header
-      }
-    );
-
-    if (!resolution.matched || !resolution.unambiguous) {
-      (resolution.diagnostics || []).forEach(message => {
-        ctx.diagnostics.push(message);
-      });
-
-      (resolution.candidates || []).forEach(candidate => {
-        const label =
-          `${candidate.detailTable || "<неизвестная таблица>"}.` +
-          `${candidate.detailForeignKeyColumn || "<неизвестная колонка>"} -> ` +
-          `${candidate.headerTable || "<неизвестная таблица>"}.` +
-          `${candidate.headerKeyColumn || "<неизвестная колонка>"}`;
-
-        ctx.diagnostics.push(`Кандидат связи: ${label}.`);
-      });
-
-      return null;
+  if (joins.length) lines.push(...joins);
+  if (ctx.period.fieldAvailable && ctx.period.preview.active) {
+    const periodTable = asTableName(tableFor(ctx.periodField, ctx.byId));
+    if (periodTable === baseTable || periodTable === header) {
+      const alias = header && periodTable === header ? "H" : "T";
+      const orderBy = addPeriodWhere(wheres, alias, ctx.periodField, ctx.period);
+      if (wheres.length) lines.push(`WHERE ${wheres.join(" AND ")}`);
+      if (orderBy) lines.push(`ORDER BY ${orderBy}`);
+      return { sql: lines.join("\n"), diagnostics: ctx.diagnostics, hint: "" };
     }
-
-    const matchingCandidates = (resolution.candidates || []).filter(candidate =>
-      candidate &&
-      candidate.detailTable === resolution.detailTable &&
-      candidate.detailForeignKeyColumn === resolution.detailForeignKeyColumn &&
-      candidate.headerTable === resolution.headerTable &&
-      candidate.headerKeyColumn === resolution.headerKeyColumn
-    );
-
-    const explicitCandidate =
-      matchingCandidates.length === 1 &&
-      matchingCandidates[0].confirmation === "explicit_columns"
-        ? matchingCandidates[0]
-        : null;
-
-    if (!explicitCandidate) {
-      (resolution.diagnostics || []).forEach(message => {
-        ctx.diagnostics.push(message);
-      });
-
-      (resolution.candidates || []).forEach(candidate => {
-        const label =
-          `${candidate.detailTable || "<unknown table>"}.` +
-          `${candidate.detailForeignKeyColumn || "<unknown column>"} -> ` +
-          `${candidate.headerTable || "<unknown table>"}.` +
-          `${candidate.headerKeyColumn || "<unknown column>"}`;
-
-        ctx.diagnostics.push(
-          `Header/detail candidate: ${label}; ` +
-          `confirmation=${candidate.confirmation || "<none>"}.`
-        );
-      });
-
-      ctx.diagnostics.push(
-        "The table-part/header relationship was found structurally, " +
-        "but the physical detail foreign key column was not confirmed."
-      );
-
-      return null;
-    }
-    lines.push(
-      `LEFT JOIN ${ctx.qn(resolution.headerTable)} AS ${H} ` +
-      `ON ${T}.[${resolution.detailForeignKeyColumn}] = ` +
-      `${H}.[${resolution.headerKeyColumn}]`
-    );
-
-    ctx.diagnostics.push(
-      `JOIN header: ` +
-      `${resolution.detailTable}.${resolution.detailForeignKeyColumn} -> ` +
-      `${resolution.headerTable}.${resolution.headerKeyColumn}`
-    );
-  } else {
-    lines.push(`FROM  ${ctx.qn(baseTable)} AS ${T}`);
+    ctx.diagnostics.push(`Период не применён: поле даты принадлежит ${periodTable || "другой таблице"}.`);
   }
-
-  lines.push(...joinLines);
-
-  if (
-    ctx.period.fieldAvailable &&
-    ctx.period.preview.active
-  ) {
-    const periodTable = asTableName(
-      tableFor(ctx.periodField, ctx.byId)
-    );
-
-    const belongsToSelect =
-      periodTable === baseTable ||
-      (
-        includeHeader &&
-        header &&
-        periodTable === header
-      );
-
-    if (belongsToSelect) {
-      const alias =
-        header && periodTable === header
-          ? H
-          : T;
-
-      orderBy = addPeriodWhere(
-        wheres,
-        alias,
-        ctx.periodField,
-        ctx.period
-      );
-    } else {
-      ctx.diagnostics.push(
-        `Период не применён к SELECT по ${baseTable}: поле даты принадлежит ${periodTable || "другой таблице"}.`
-      );
-    }
-  }
-
   if (wheres.length) lines.push(`WHERE ${wheres.join(" AND ")}`);
-  if (orderBy) lines.push(`ORDER BY ${orderBy}`);
-  return lines.join("\n");
-}
-
-
-function addRelationshipDiagnostics(ctx) {
-  const selectedTables = new Set();
-  ctx.selectedOrig.forEach(row => {
-    const table = tableFor(row, ctx.byId);
-    if (table) selectedTables.add(asTableName(table));
-  });
-  ctx.selectedSynth.forEach(meta => {
-    if ((meta.chain || []).length > 1) {
-      ctx.diagnostics.push(`Deep reference chain (${meta.chain.length}): ${chainText(meta.chain)}. Check whether this is 1:1; otherwise rows can multiply.`);
-    }
-  });
-  const vtCount = Array.from(selectedTables).filter(isVTTableName).length;
-  if (vtCount > 1) {
-    ctx.diagnostics.push(`Several tabular sections selected (${vtCount}). This can be 1:N; keep detail rows unless aggregation is intentional.`);
-  }
-  if (ctx.relationMode === "warn") {
-    ctx.diagnostics.push("1:N mode: warnings only. SQL keeps current detail and does not aggregate rows.");
-  } else {
-    ctx.diagnostics.push("1:N mode: keep rows. STRING_AGG can be added as an explicit mode later.");
-  }
+  return { sql: lines.join("\n"), diagnostics: ctx.diagnostics, hint: "" };
 }

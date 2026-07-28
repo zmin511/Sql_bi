@@ -358,7 +358,7 @@ test("generateSql fails closed when the detail foreign key is only structural", 
   assert.ok(
     result.diagnostics.some(message =>
       message.includes(
-        "physical detail foreign key column was not confirmed"
+        "физическая колонка связи табличной части не подтверждена"
       )
     )
   );

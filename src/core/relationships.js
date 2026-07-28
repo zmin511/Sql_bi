@@ -281,3 +281,49 @@ export function resolveTablePartHeaderJoin(tablePart, context = {}) {
 
   return result;
 }
+
+export function validateRelationshipForSql(relationship) {
+  const result = {
+    valid: false,
+    candidate: null,
+    reason: "unknown_relationship",
+    diagnostics: []
+  };
+
+  if (!relationship || !relationship.matched) {
+    result.reason = "relationship_not_matched";
+  } else if (!relationship.unambiguous) {
+    result.reason = "relationship_ambiguous";
+  } else {
+    const candidates = (relationship.candidates || []).filter(
+      candidate =>
+        candidate &&
+        candidate.detailTable === relationship.detailTable &&
+        candidate.detailForeignKeyColumn === relationship.detailForeignKeyColumn &&
+        candidate.headerTable === relationship.headerTable &&
+        candidate.headerKeyColumn === relationship.headerKeyColumn
+    );
+
+    if (candidates.length !== 1) {
+      result.reason = candidates.length
+        ? "multiple_matching_candidates"
+        : "matching_candidate_not_found";
+    } else if (candidates[0].confirmation !== "explicit_columns") {
+      result.reason = "physical_detail_foreign_key_not_confirmed";
+    } else {
+      return {
+        valid: true,
+        candidate: candidates[0],
+        reason: "resolved",
+        diagnostics: []
+      };
+    }
+  }
+
+  result.diagnostics.push(
+    result.reason === "physical_detail_foreign_key_not_confirmed"
+      ? "Связь найдена структурно, но физическая колонка связи табличной части не подтверждена. SQL намеренно не сформирован."
+      : "Не найдена единственная подтверждённая физическая связь шапки и табличной части. SQL намеренно не сформирован."
+  );
+  return result;
+}
