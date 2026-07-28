@@ -4,7 +4,8 @@ const PERIOD_LIMITS = Object.freeze({
 });
 
 export function sqlDateExpr(alias, column, type = "") {
-  const expr = `${alias}.[${column}]`;
+  const expr = qualifiedColumn(alias, column);
+  if (!expr) return null;
   const isDate =
     /_Date_Time$/i.test(column) ||
     column === "_Date_Time" ||
@@ -366,3 +367,4 @@ export function buildManualDateRange(
         : `Ручной период: с ${from.value} по ${to.value} включительно.`
   };
 }
+import { qualifiedColumn } from "./sqlIdentifiers.js";

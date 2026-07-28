@@ -144,7 +144,7 @@ function noSql(result) {
 
 {
   const row = { id: "x", internal: "_Fld1", object: "Value", title: "Value", parentId: null };
-  assert.match(generateSql(input([row], { x: true }, { fromTable: "dbo._ManualView" })).sql, /FROM  \[dbo\]\.\[_ManualView\] AS F/);
+  assert.match(generateSql(input([row], { x: true }, { fromTable: "dbo._ManualView" })).sql, /FROM  \[dbo\]\.\[dbo\._ManualView\] AS F/);
   noSql(generateSql(input([row], { x: true }, { fromTable: "   " })));
   assert.equal(generateSql(input([row], {}, { fromTable: "_ManualView" })).sql, "-- Select at least one field");
   assert.match(generateSql(input([row], { x: true }, { fromTable: "_ManualView" })).sql, /FROM  \[dbo\]\.\[_ManualView\] AS F/);

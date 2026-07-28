@@ -1,4 +1,5 @@
 import { isBoolType } from "./types.js";
+import { qualifiedColumn } from "./sqlIdentifiers.js";
 
 export function castExpr(
   alias,
@@ -7,9 +8,8 @@ export function castExpr(
   diagnostics,
   context
 ) {
-  const expr = alias
-    ? `${alias}.[${column}]`
-    : `[${column}]`;
+  const expr = qualifiedColumn(alias, column);
+  if (!expr) return null;
 
   const isDate =
     /_Date_Time$/i.test(column) ||
