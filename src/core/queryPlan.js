@@ -81,7 +81,7 @@ export function buildQueryPlan(input = {}) {
       return blocked(policy.reason, diagnostics, selectionContext, joins);
     }
     relationship = policy.candidate;
-    joins.push({ id: `header_detail:${relationship.detailTable}:${relationship.detailForeignKeyColumn}:${relationship.headerTable}:${relationship.headerKeyColumn}`, kind: "header_detail", sourceRowId: null, sourceTable: relationship.detailTable, sourceAlias: "T", sourceColumn: relationship.detailForeignKeyColumn, targetRootId: null, targetTable: relationship.headerTable, targetAlias: "H", targetColumn: relationship.headerKeyColumn, status: "sql", reason: null, confirmation: relationship.confirmation, syntheticIds: [], depth: 0 });
+    joins.push({ id: `header_detail:${relationship.detailTable}:${relationship.detailForeignKeyColumn}:${relationship.headerTable}:${relationship.headerKeyColumn}`, kind: "header_detail", sourceRowId: null, sourceTable: relationship.detailTable, sourceAlias: "T", sourceColumn: relationship.detailForeignKeyColumn, targetRootId: null, targetTable: relationship.headerTable, targetAlias: "H", targetColumn: relationship.headerKeyColumn, status: "sql", reason: null, confirmation: relationship.confirmation, syntheticIds: [], depth: 0, sql: `LEFT JOIN ${qname(db, schema, relationship.headerTable)} AS H ON ${qualifiedColumn("T", relationship.detailForeignKeyColumn)} = ${qualifiedColumn("H", relationship.headerKeyColumn)}` });
     if (!qname(db, schema, relationship.headerTable) || !qualifiedColumn("T", relationship.detailForeignKeyColumn) || !qualifiedColumn("H", relationship.headerKeyColumn)) {
       diagnostics.push("JOIN шапки не сформирован: отсутствует безопасный SQL-идентификатор.");
       joins[joins.length - 1].status = "blocked";
@@ -93,7 +93,7 @@ export function buildQueryPlan(input = {}) {
   const baseTable = selectionContext.mode === "manual" ? selectionContext.basePhysicalTable : relationship ? relationship.detailTable : selectionContext.basePhysicalTable;
   const aliases = { base: selectionContext.mode === "manual" ? "F" : "T", header: selectionContext.mode === "manual" ? "F" : "H" };
   const usedAliases = new Set(); const selections = []; const wheres = []; const referenceByPath = new Map(); let nextReferenceAlias = 1;
-  const ensureReference = (parentAlias, step, synthId, depth) => {
+  const ensureReference = (parentAlias, step, synthId, depth, sourceRowId, sourceTable) => {
     const key = `${parentAlias}.${step.refInternal}->${step.targetTable}`;
     const existing = referenceByPath.get(key);
     if (existing) { if (!existing.syntheticIds.includes(synthId)) existing.syntheticIds.push(synthId); return existing; }
@@ -104,15 +104,17 @@ export function buildQueryPlan(input = {}) {
       return null;
     }
     const targetRoot = rows.filter(row => String(row.internal || "").toLowerCase() === String(step.targetTable || "").toLowerCase())[0] || null;
-    const edge = { id: `reference:${parentAlias}:${sourceColumn}:${step.targetTable}:${targetColumn}:${depth}`, kind: "reference", sourceRowId: null, sourceTable: null, sourceAlias: parentAlias, sourceColumn, targetRootId: targetRoot && targetRoot.id || null, targetTable: step.targetTable, targetAlias, targetColumn, status: "sql", reason: null, confirmation: null, syntheticIds: [synthId], depth };
+    const edge = { id: `reference:${parentAlias}:${sourceColumn}:${step.targetTable}:${targetColumn}:${depth}`, kind: "reference", sourceRowId, sourceTable, sourceAlias: parentAlias, sourceColumn, targetRootId: targetRoot && targetRoot.id || null, targetTable: step.targetTable, targetAlias, targetColumn, status: "sql", reason: null, confirmation: null, syntheticIds: [synthId], depth, sql: `LEFT JOIN ${qname(db, schema, step.targetTable)} AS ${targetAlias} ON ${qualifiedColumn(targetAlias, targetColumn)} = ${qualifiedColumn(parentAlias, sourceColumn)}` };
     referenceByPath.set(key, edge); joins.push(edge); return edge;
   };
   const addSelection = (id, kind, row, meta, sourceRow) => {
     const sourceTable = tableName(tableFor(sourceRow || row, byId));
     if (selectionContext.mode !== "manual" && sourceTable !== baseTable && sourceTable !== (relationship && relationship.headerTable)) return;
     let sourceAlias = relationship && sourceTable === relationship.headerTable ? aliases.header : aliases.base;
+    let joinSourceRowId = sourceRow && sourceRow.id || null;
+    let joinSourceTable = sourceTable;
     for (let index = 0; meta && index < meta.chain.length; index += 1) {
-      const edge = ensureReference(sourceAlias, meta.chain[index], id, index + 1); if (!edge) return; sourceAlias = edge.targetAlias;
+      const edge = ensureReference(sourceAlias, meta.chain[index], id, index + 1, joinSourceRowId, joinSourceTable); if (!edge) return; sourceAlias = edge.targetAlias; joinSourceRowId = null; joinSourceTable = edge.targetTable;
     }
     const field = meta ? meta.field : row;
     const expression = castExpr(sourceAlias, field.internal || field.object, field.type, diagnostics, field.title || field.object || field.internal);

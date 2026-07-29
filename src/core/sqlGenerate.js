@@ -1,5 +1,5 @@
 import { buildQueryPlan } from "./queryPlan.js";
-import { qname, qualifiedColumn } from "./sqlIdentifiers.js";
+import { qname } from "./sqlIdentifiers.js";
 
 export { qname };
 export function boolFilterValueForId(id, boolFilters = {}) { const item = boolFilters[id]; return item && item.yes && !item.no ? 1 : item && item.no && !item.yes ? 0 : null; }
@@ -18,11 +18,7 @@ export function generateSql(input = {}) {
   if (plan.sqlParts.empty) return { sql: "-- Select at least one field", diagnostics: [], hint: "", plan };
   const parts = plan.sqlParts;
   const lines = ["SELECT", `  ${plan.selections.map(item => `${item.expression} AS ${item.outputAlias}`).join(",\n  ")}`, `FROM  ${parts.from} AS ${parts.baseAlias}`];
-  for (const join of plan.joins) {
-    if (join.status !== "sql") continue;
-    if (join.kind === "header_detail") lines.push(`LEFT JOIN ${qname(String(input.dbName || "").trim(), String(input.schema || "").trim(), join.targetTable)} AS ${join.targetAlias} ON ${qualifiedColumn(join.sourceAlias, join.sourceColumn)} = ${qualifiedColumn(join.targetAlias, join.targetColumn)}`);
-    else lines.push(`LEFT JOIN ${qname(String(input.dbName || "").trim(), String(input.schema || "").trim(), join.targetTable)} AS ${join.targetAlias} ON ${qualifiedColumn(join.targetAlias, join.targetColumn)} = ${qualifiedColumn(join.sourceAlias, join.sourceColumn)}`);
-  }
+  for (const join of plan.joins) if (join.status === "sql") lines.push(join.sql);
   if (parts.wheres.length) lines.push(`WHERE ${parts.wheres.join(" AND ")}`);
   if (parts.orderBy) lines.push(`ORDER BY ${parts.orderBy}`);
   return { sql: lines.join("\n"), diagnostics: plan.diagnostics, hint: "", plan };
