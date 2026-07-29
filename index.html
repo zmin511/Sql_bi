@@ -2392,7 +2392,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
       metaById:{},       // для синтетических узлов
       referenceDiagnostics:{}, // nodeId -> сообщение безопасного разрешения ссылки
       boolFilters:{},    // id -> {yes,no}
-      queryPlan:null, queryResult:null
+      queryPlan:null, queryResult:null, queryGraph:{viewMode:"split",graphFilter:"all"}
     ,flatten:{}    // tableName -> true (режим "Плоская" для _VT)
     };
 
@@ -2431,6 +2431,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
       return Number.isFinite(number) ? Math.max(min,Math.min(max,Math.trunc(number))) : fallback;
     };
     const projectDate = value=>typeof value==="string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+    const normalizeVisualizationSettings = value=>{ const source=projectPlainObject(value); return {viewMode:["tree","graph","split"].includes(source.viewMode)?source.viewMode:"split",graphFilter:["all","active","sql","errors"].includes(source.graphFilter)?source.graphFilter:"all"}; };
 
     function createProjectSnapshot(){
       if(!state.rows.length) throw new Error("Сначала загрузите структуру MXL/XLSX.");
@@ -2459,7 +2460,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
           periodMonthsFuture:projectInteger(state.periodMonthsFuture,0,0,1200), periodDaysFuture:projectInteger(state.periodDaysFuture,0,0,36600),
           refDepth:projectInteger(state.refDepth,5,1,5), relationMode:state.relationMode==="warn"?"warn":"detail"
         },
-        view:{search:projectString(state.search),expanded:projectBooleanMap(state.expanded)}
+        view:{search:projectString(state.search),expanded:projectBooleanMap(state.expanded),visualization:normalizeVisualizationSettings(state.queryGraph)}
       };
     }
 
@@ -2502,7 +2503,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
         periodMode:query.periodMode==="manual"?"manual":"relative", dateFrom:projectDate(query.dateFrom), dateTo:projectDate(query.dateTo),
         periodMonths:projectInteger(query.periodMonths,3,0,1200), periodDays:projectInteger(query.periodDays,0,0,36600),
         periodMonthsFuture:projectInteger(query.periodMonthsFuture,0,0,1200), periodDaysFuture:projectInteger(query.periodDaysFuture,0,0,36600),
-        refDepth:projectInteger(query.refDepth,5,1,5), relationMode:query.relationMode==="warn"?"warn":"detail"
+        refDepth:projectInteger(query.refDepth,5,1,5), relationMode:query.relationMode==="warn"?"warn":"detail", queryGraph:normalizeVisualizationSettings(view.visualization)
       };
     }
 
@@ -2581,15 +2582,16 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
       state.dateFrom=restored.dateFrom; state.dateTo=restored.dateTo;
       state.periodMonths=restored.periodMonths; state.periodDays=restored.periodDays;
       state.periodMonthsFuture=restored.periodMonthsFuture; state.periodDaysFuture=restored.periodDaysFuture;
-      state.refDepth=restored.refDepth; state.relationMode=restored.relationMode;
+      state.refDepth=restored.refDepth; state.relationMode=restored.relationMode; state.queryGraph=restored.queryGraph;
 
       $("search").value=state.search;
       $("serverName").value=state.serverName; $("dbName").value=state.dbName; $("schema").value=state.schema; $("fromTable").value=state.fromTable;
       $("dateFrom").value=state.dateFrom; $("dateTo").value=state.dateTo;
       $("periodMonths").value=state.periodMonths; $("periodDays").value=state.periodDays;
       $("periodMonthsFuture").value=state.periodMonthsFuture; $("periodDaysFuture").value=state.periodDaysFuture;
-      $("refDepth").value=state.refDepth; $("relationMode").value=state.relationMode;
-      syncPeriodModeUI(); renderTree(); renderSQL();
+      $("refDepth").value=state.refDepth; $("relationMode").value=state.relationMode; $("structureViewMode").value=state.queryGraph.viewMode; $("queryGraphFilter").value=state.queryGraph.graphFilter;
+      const graph=$("queryGraphPanel"),tree=$("tree"); graph.style.display=state.queryGraph.viewMode==="tree"?"none":"block"; tree.style.display=state.queryGraph.viewMode==="graph"?"none":"block";
+      syncPeriodModeUI(); renderTree(); renderSQL(); renderQueryGraph();
       return restored;
     }
 
@@ -4382,8 +4384,8 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
       renderTree(); renderSQL();
     };
     $("relationMode").onchange = (e)=>{ state.relationMode = e.target.value; renderSQL(); };
-    $("queryGraphFilter").onchange = ()=>renderQueryGraph();
-    $("structureViewMode").onchange = e=>{ const graph=$("queryGraphPanel"),tree=$("tree"); graph.style.display=e.target.value==="tree"?"none":"block"; tree.style.display=e.target.value==="graph"?"none":"block"; renderQueryGraph(); };
+    $("queryGraphFilter").onchange = e=>{ state.queryGraph.graphFilter=normalizeVisualizationSettings({graphFilter:e.target.value,viewMode:state.queryGraph.viewMode}).graphFilter; renderQueryGraph(); };
+    $("structureViewMode").onchange = e=>{ state.queryGraph.viewMode=normalizeVisualizationSettings({viewMode:e.target.value,graphFilter:state.queryGraph.graphFilter}).viewMode; const graph=$("queryGraphPanel"),tree=$("tree"); graph.style.display=state.queryGraph.viewMode==="tree"?"none":"block"; tree.style.display=state.queryGraph.viewMode==="graph"?"none":"block"; renderQueryGraph(); };
 
     $("btn-copy").onclick = async ()=>{
       const ta=$("sql");

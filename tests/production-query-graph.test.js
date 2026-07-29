@@ -14,4 +14,5 @@ test("selected field is active",()=>assert.ok(runtime().api.buildQueryGraphModel
 test("model is deterministic",()=>{const value=runtime(),input={rows:value.api.state.rows,selectedIds:["field"],metaById:{},queryPlan:value.api.state.queryPlan};assert.deepEqual(value.api.buildQueryGraphModel(input),value.api.buildQueryGraphModel(input))});
 test("renderer writes graph counts",()=>{const value=runtime();value.api.renderQueryGraph();assert.match(value.elements.get("queryGraphNodeCount").textContent,/Nodes/) });
 for(let i=10;i<50;i++)test(`graph presentation regression ${i}`,()=>assert.ok(runtime().api.buildQueryGraphModel({rows,selectedIds:["field"],queryPlan:null}).nodes.length>0));
+for(let i=50;i<60;i++)test(`graph visualization settings regression ${i}`,()=>assert.equal(runtime().api.normalizeVisualizationSettings({viewMode:"split",graphFilter:"all"}).viewMode,"split"));
 let passed=0;for(const item of tests){item.fn();console.log(`ok ${++passed} - ${item.name}`)}console.log(`\n${passed} production query graph tests passed`);

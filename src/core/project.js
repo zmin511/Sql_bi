@@ -1,5 +1,6 @@
 export const PROJECT_KIND = "sql-bi-project";
 export const PROJECT_FORMAT_VERSION = 1;
+export const DEFAULT_VISUALIZATION_SETTINGS = Object.freeze({ viewMode: "split", graphFilter: "all" });
 
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
@@ -43,6 +44,14 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+export function normalizeVisualizationSettings(value) {
+  const source = plainObject(value);
+  return {
+    viewMode: ["tree", "graph", "split"].includes(source.viewMode) ? source.viewMode : DEFAULT_VISUALIZATION_SETTINGS.viewMode,
+    graphFilter: ["all", "active", "sql", "errors"].includes(source.graphFilter) ? source.graphFilter : DEFAULT_VISUALIZATION_SETTINGS.graphFilter
+  };
+}
+
 export function createProjectSnapshot(state, appVersion = "0.2.1") {
   const rows = Array.isArray(state.rows) ? cloneJson(state.rows) : [];
   if (!rows.length) throw new Error("Сначала загрузите структуру MXL/XLSX.");
@@ -83,7 +92,8 @@ export function createProjectSnapshot(state, appVersion = "0.2.1") {
     },
     view: {
       search: stringValue(state.search),
-      expanded: booleanMap(state.expanded)
+      expanded: booleanMap(state.expanded),
+      visualization: normalizeVisualizationSettings(state.queryGraph)
     }
   };
 }
@@ -155,5 +165,6 @@ export function parseProjectSnapshot(input) {
     periodDaysFuture: finiteInteger(query.periodDaysFuture, 0, 0, 36600),
     refDepth: finiteInteger(query.refDepth, 5, 1, 5),
     relationMode: query.relationMode === "warn" ? "warn" : "detail"
+    ,queryGraph: normalizeVisualizationSettings(view.visualization)
   };
 }

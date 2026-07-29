@@ -160,7 +160,7 @@ export function loadProductionRuntime(indexPath = "index.html") {
       renderTree, renderDiagnostics, makeRefChildrenFor, maxRefDepth,
       isReferenceField, nodeData, buildCanonicalInputFromState,
       renderCanonicalSQL, renderQueryPlanPanel, buildQueryGraphModel,
-      renderQueryGraph,
+      renderQueryGraph, createProjectSnapshot, parseProjectSnapshot, applyProjectSnapshot, normalizeVisualizationSettings,
       setReferenceDepthForTest: value => { state.refDepth = value; },`
   );
 
