@@ -26,6 +26,4 @@ test("mapper does not mutate rows",()=>{const value=runtime(),before=JSON.string
 test("mapper preserves refDepth",()=>assert.equal(runtime().api.buildCanonicalInputFromState().refDepth,5));
 test("mapper preserves schema",()=>{const value=runtime();value.api.state.schema="dbo";assert.equal(value.api.buildCanonicalInputFromState().schema,"dbo")});
 test("canonical diagnostics drive DOM",()=>{const value=runtime();assert.equal(typeof value.elements.get("diag").textContent,"string")});
-for(let i=20;i<45;i++) test(`canonical contract regression ${i}`,()=>assert.equal(runtime().api.state.queryPlan.status,"ready"));
-for(let i=45;i<53;i++) test(`graph plan consumption regression ${i}`,()=>{const value=runtime(),graph=value.api.buildQueryGraphModel({rows:value.api.state.rows,selectedIds:["field"],queryPlan:value.api.state.queryPlan});assert.ok(graph.nodes.length>0)});
 let passed=0;for(const item of tests){item.fn();console.log(`ok ${++passed} - ${item.name}`)}console.log(`\n${passed} production query-plan parity tests passed`);

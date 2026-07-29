@@ -7,7 +7,7 @@ const html = fs.readFileSync("index.html", "utf8");
 
 assert.match(html, /^\s*<!DOCTYPE html>/i);
 assert.match(html, /<meta\s+charset=["']UTF-8["']/i);
-assert.match(html, /window\.__SQLBI_TEST__\s*=/);
+assert.doesNotMatch(html, /window\.__SQLBI_TEST__\s*=/);
 
 assert.doesNotMatch(
   html,
@@ -22,9 +22,12 @@ assert.doesNotMatch(
 );
 
 const { api, source, canonicalCore } = loadProductionRuntime("index.html");
+const uninstrumented = loadProductionRuntime({ indexPath: "index.html", instrument: false });
 verify(html);
 assert.equal(typeof canonicalCore?.buildQueryPlan, "function");
 assert.equal(typeof canonicalCore?.generateSql, "function");
+assert.equal(typeof canonicalCore?.normalizeVisualizationSettings, "function");
+assert.equal(uninstrumented.api, null);
 
 new Function(source);
 
@@ -62,4 +65,5 @@ console.log("ok 1 - portable HTML uses only embedded runtime assets");
 console.log("ok 2 - production application script has valid JavaScript syntax");
 console.log("ok 3 - test harness reaches required production runtime contracts");
 console.log("ok 4 - generated canonical core is synchronized");
-console.log("\n4 portable checks passed");
+console.log("ok 5 - raw HTML has no public test API and uninstrumented VM has no hooks");
+console.log("\n5 portable checks passed");

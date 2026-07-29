@@ -233,7 +233,7 @@ var o=((a=s[17])==null?void 0:a[0])?Ob(e,e[_b(s[17][0].data)][0]):[];var l=vb(s[
 var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.s.r;c<=n.e.r;++c){i=Ta(c);for(f=n.s.c;f<=n.e.c;++f){r=s[f]+i;t=l?(e[c]||[])[f]:e[r];a="";if(t===undefined)continue;else if(t.F!=null){r=t.F;if(!t.f)continue;a=t.f;if(r.indexOf(":")==-1)r=r+":"+r}if(t.f!=null)a=t.f;else if(t.t=="z")continue;else if(t.t=="n"&&t.v!=null)a=""+t.v;else if(t.t=="b")a=t.v?"TRUE":"FALSE";else if(t.w!==undefined)a="'"+t.w;else if(t.v===undefined)continue;else if(t.t=="s")a="'"+t.v;else a=""+t.v;o[o.length]=r+"="+a}}return o}function xw(e,r,t){var a=t||{};var n=+!a.skipHeader;var i=e||{};var s=0,f=0;if(i&&a.origin!=null){if(typeof a.origin=="number")s=a.origin;else{var o=typeof a.origin=="string"?Oa(a.origin):a.origin;s=o.r;f=o.c}}var l;var c={s:{c:0,r:0},e:{c:f,r:s+r.length-1+n}};if(i["!ref"]){var h=Da(i["!ref"]);c.e.c=Math.max(c.e.c,h.e.c);c.e.r=Math.max(c.e.r,h.e.r);if(s==-1){s=h.e.r+1;c.e.r=s+r.length-1+n}}else{if(s==-1){s=0;c.e.r=r.length-1+n}}var u=a.header||[],d=0;r.forEach(function(e,r){rr(e).forEach(function(t){if((d=u.indexOf(t))==-1)u[d=u.length]=t;var o=e[t];var c="z";var h="";var v=Ra({c:f+d,r:s+r+n});l=Rw(i,v);if(o&&typeof o==="object"&&!(o instanceof Date)){i[v]=o}else{if(typeof o=="number")c="n";else if(typeof o=="boolean")c="b";else if(typeof o=="string")c="s";else if(o instanceof Date){c="d";if(!a.cellDates){c="n";o=fr(o)}h=a.dateNF||X[14]}else if(o===null&&a.nullError){c="e";o=0}if(!l)i[v]=l={t:c,v:o};else{l.t=c;l.v=o;delete l.w;delete l.R;if(h)l.z=h}if(h)l.z=h}})});c.e.c=Math.max(c.e.c,f+u.length-1);var v=Ta(s);if(n)for(d=0;d<u.length;++d)i[ya(d+f)+v]={t:"s",v:u[d]};i["!ref"]=Na(c);return i}function Ow(e,r){return xw(null,e,r)}function Rw(e,r,t){if(typeof r=="string"){if(Array.isArray(e)){var a=Oa(r);if(!e[a.r])e[a.r]=[];return e[a.r][a.c]||(e[a.r][a.c]={t:"z"})}return e[r]||(e[r]={t:"z"})}if(typeof r!="number")return Rw(e,Ra(r));return Rw(e,Ra({r:r,c:t||0}))}function Iw(e,r){if(typeof r=="number"){if(r>=0&&e.SheetNames.length>r)return r;throw new Error("Cannot find sheet # "+r)}else if(typeof r=="string"){var t=e.SheetNames.indexOf(r);if(t>-1)return t;throw new Error("Cannot find sheet name |"+r+"|")}else throw new Error("Cannot find sheet |"+r+"|")}function Nw(){return{SheetNames:[],Sheets:{}}}function Dw(e,r,t,a){var n=1;if(!t)for(;n<=65535;++n,t=undefined)if(e.SheetNames.indexOf(t="Sheet"+n)==-1)break;if(!t||e.SheetNames.length>=65535)throw new Error("Too many worksheets");if(a&&e.SheetNames.indexOf(t)>=0){var i=t.match(/(^.*?)(\d+)$/);n=i&&+i[2]||0;var s=i&&i[1]||t;for(++n;n<=65535;++n)if(e.SheetNames.indexOf(t=s+n)==-1)break}Jp(t);if(e.SheetNames.indexOf(t)>=0)throw new Error("Worksheet with name |"+t+"| already exists!");e.SheetNames.push(t);e.Sheets[t]=r;return t}function Fw(e,r,t){if(!e.Workbook)e.Workbook={};if(!e.Workbook.Sheets)e.Workbook.Sheets=[];var a=Iw(e,r);if(!e.Workbook.Sheets[a])e.Workbook.Sheets[a]={};switch(t){case 0:;case 1:;case 2:break;default:throw new Error("Bad sheet visibility setting "+t);}e.Workbook.Sheets[a].Hidden=t}function Pw(e,r){e.z=r;return e}function Lw(e,r,t){if(!r){delete e.l}else{e.l={Target:r};if(t)e.l.Tooltip=t}return e}function Mw(e,r,t){return Lw(e,"#"+r,t)}function Uw(e,r,t){if(!e.c)e.c=[];e.c.push({t:r,a:t||"SheetJS"})}function Bw(e,r,t,a){var n=typeof r!="string"?r:Da(r);var i=typeof r=="string"?r:Na(r);for(var s=n.s.r;s<=n.e.r;++s)for(var f=n.s.c;f<=n.e.c;++f){var o=Rw(e,s,f);o.t="n";o.F=i;delete o.v;if(s==n.s.r&&f==n.s.c){o.f=t;if(a)o.D=true}}return e}var Ww={encode_col:ya,encode_row:Ta,encode_cell:Ra,encode_range:Na,decode_col:Ca,decode_row:ka,split_cell:xa,decode_cell:Oa,decode_range:Ia,format_cell:Pa,sheet_add_aoa:Ma,sheet_add_json:xw,sheet_add_dom:Gm,aoa_to_sheet:Ua,json_to_sheet:Ow,table_to_sheet:jm,table_to_book:Xm,sheet_to_csv:yw,sheet_to_txt:Sw,sheet_to_json:Aw,sheet_to_html:Vm,sheet_to_formulae:_w,sheet_to_row_object_array:Aw,sheet_get_cell:Rw,book_new:Nw,book_append_sheet:Dw,book_set_sheet_visibility:Fw,cell_set_number_format:Pw,cell_set_hyperlink:Lw,cell_set_internal_link:Mw,cell_add_comment:Uw,sheet_set_array_formula:Bw,consts:{SHEET_VISIBLE:0,SHEET_HIDDEN:1,SHEET_VERY_HIDDEN:2}};var Hw;function zw(e){Hw=e}function Vw(e,r){var t=Hw();var a=r==null?{}:r;if(e==null||e["!ref"]==null){t.push(null);return t}var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=n.s.r;var g=false,m=0;t._read=function(){if(!g){g=true;return t.push("\ufeff")}while(p<=n.e.r){++p;if((d[p-1]||{}).hidden)continue;c=Cw(e,n,p-1,h,s,o,i,a);if(c!=null){if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)return t.push((m++?f:"")+c)}}return t.push(null)};return t}function Gw(e,r){var t=Hw();var a=r||{};var n=a.header!=null?a.header:Bm;var i=a.footer!=null?a.footer:Wm;t.push(n);var s=Ia(e["!ref"]);a.dense=Array.isArray(e);t.push(zm(e,s,a));var f=s.s.r;var o=false;t._read=function(){if(f>s.e.r){if(!o){o=true;t.push("</table>"+i)}return t.push(null)}while(f<=s.e.r){t.push(Um(e,s,f,a));++f;break}};return t}function jw(e,r){var t=Hw({objectMode:true});if(e==null||e["!ref"]==null){t.push(null);return t}var a={t:"n",v:0},n=0,i=1,s=[],f=0,o="";var l={s:{r:0,c:0},e:{r:0,c:0}};var c=r||{};var h=c.range!=null?c.range:e["!ref"];if(c.header===1)n=1;else if(c.header==="A")n=2;else if(Array.isArray(c.header))n=3;switch(typeof h){case"string":l=Da(h);break;case"number":l=Da(e["!ref"]);l.s.r=h;break;default:l=h;}if(n>0)i=0;var u=Ta(l.s.r);var d=[];var v=0;var p=Array.isArray(e);var g=l.s.r,m=0;var b={};if(p&&!e[g])e[g]=[];var w=c.skipHidden&&e["!cols"]||[];var k=c.skipHidden&&e["!rows"]||[];for(m=l.s.c;m<=l.e.c;++m){if((w[m]||{}).hidden)continue;d[m]=ya(m);a=p?e[g][m]:e[d[m]+u];switch(n){case 1:s[m]=m-l.s.c;break;case 2:s[m]=d[m];break;case 3:s[m]=c.header[m-l.s.c];break;default:if(a==null)a={w:"__EMPTY",t:"s"};o=f=Pa(a,null,c);v=b[f]||0;if(!v)b[f]=1;else{do{o=f+"_"+v++}while(b[o]);b[f]=v;b[o]=1}s[m]=o;}}g=l.s.r+i;t._read=function(){while(g<=l.e.r){if((k[g-1]||{}).hidden)continue;var r=Tw(e,l,g,d,n,s,p,c);++g;if(r.isempty===false||(n===1?c.blankrows!==false:!!c.blankrows)){t.push(r.row);return}}return t.push(null)};return t}var Xw={to_json:jw,to_html:Gw,to_csv:Vw,set_readable:zw};if(typeof vm!=="undefined")e.parse_xlscfb=vm;e.parse_zip=Xb;e.read=iw;e.readFile=sw;e.readFileSync=sw;e.write=gw;e.writeFile=bw;e.writeFileSync=bw;e.writeFileAsync=kw;e.utils=Ww;e.writeXLSX=pw;e.writeFileXLSX=ww;e.SSF=Ve;if(typeof Xw!=="undefined")e.stream=Xw;if(typeof Ke!=="undefined")e.CFB=Ke;if(typeof require!=="undefined"){var $w=undefined;if(($w||{}).Readable)zw($w.Readable)}}if(typeof exports!=="undefined")make_xlsx_lib(exports);else if(typeof module!=="undefined"&&module.exports)make_xlsx_lib(module.exports);else if(typeof define==="function"&&define.amd)define("xlsx",function(){if(!XLSX.version)make_xlsx_lib(XLSX);return XLSX});else make_xlsx_lib(XLSX);if(typeof window!=="undefined"&&!window.XLSX)try{window.XLSX=XLSX}catch(e){}
 <!-- BEGIN GENERATED CANONICAL CORE -->
 /* Generated from canonical src/core modules. Do not edit manually. */
-/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"5e8c1b6e305f23475f75a75c089c0e71b087750f1fb42cc5138a817d5b08baff"},{"file":"src/core/casts.js","sha256":"9f09c1aa93b47fa3897f41f6629e5abe2db7635545b1af5f7bc7409b4fbe567a"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/queryPlan.js","sha256":"16c8d7028f68f74c9d7d98e387f8d9d6edaa7ddfc385be564ce4320b4f72132a"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"}],"payloadSha256":"5f2768284a7a826315d3942596aeccc486b1872ac3bcde4e75072c7af89280e2"} */
+/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"5e8c1b6e305f23475f75a75c089c0e71b087750f1fb42cc5138a817d5b08baff"},{"file":"src/core/casts.js","sha256":"9f09c1aa93b47fa3897f41f6629e5abe2db7635545b1af5f7bc7409b4fbe567a"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/queryPlan.js","sha256":"16c8d7028f68f74c9d7d98e387f8d9d6edaa7ddfc385be564ce4320b4f72132a"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"6eef1553cfde3bc6bb5437624ada873066f7b9f13310f51d802cfff4c1d752d7"}],"payloadSha256":"32a647f71289b8add9a41b9b4860984a035b6c5956b24f2fbba4451f0a1981ee"} */
 (function(){
 // src/core/sqlIdentifiers.js
 function quoteIdentifier(value) {
@@ -2373,7 +2373,179 @@ function generateSql(input = {}) {
   return { sql: lines.join("\n"), diagnostics: plan.diagnostics, hint: "", plan };
 }
 
-window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
+// src/core/project.js
+const PROJECT_KIND = "sql-bi-project";
+const PROJECT_FORMAT_VERSION = 1;
+const DEFAULT_VISUALIZATION_SETTINGS = Object.freeze({ viewMode: "split", graphFilter: "all" });
+
+const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+function plainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function booleanMap(value) {
+  const result = {};
+  for (const [key, enabled] of Object.entries(plainObject(value))) {
+    if (enabled === true) result[String(key)] = true;
+  }
+  return result;
+}
+
+function boolFilterMap(value) {
+  const result = {};
+  for (const [key, filter] of Object.entries(plainObject(value))) {
+    const source = plainObject(filter);
+    const normalized = { yes: source.yes === true, no: source.no === true };
+    if (normalized.yes || normalized.no) result[String(key)] = normalized;
+  }
+  return result;
+}
+
+function finiteInteger(value, fallback, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(number)));
+}
+
+function stringValue(value, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function validIsoDate(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeVisualizationSettings(value) {
+  const source = plainObject(value);
+  return {
+    viewMode: ["tree", "graph", "split"].includes(source.viewMode) ? source.viewMode : DEFAULT_VISUALIZATION_SETTINGS.viewMode,
+    graphFilter: ["all", "active", "sql", "errors"].includes(source.graphFilter) ? source.graphFilter : DEFAULT_VISUALIZATION_SETTINGS.graphFilter
+  };
+}
+
+function createProjectSnapshot(state, appVersion = "0.2.1") {
+  const rows = Array.isArray(state.rows) ? cloneJson(state.rows) : [];
+  if (!rows.length) throw new Error("Сначала загрузите структуру MXL/XLSX.");
+
+  const selected = booleanMap(state.selected);
+  const synthetic = {};
+  for (const id of Object.keys(selected)) {
+    if (!state.byId?.[id] && state.metaById?.[id]) synthetic[id] = cloneJson(state.metaById[id]);
+  }
+
+  return {
+    kind: PROJECT_KIND,
+    formatVersion: PROJECT_FORMAT_VERSION,
+    appVersion: String(appVersion),
+    savedAt: new Date().toISOString(),
+    structure: { rows },
+    selection: {
+      selected,
+      synthetic,
+      boolFilters: boolFilterMap(state.boolFilters),
+      flatten: booleanMap(state.flatten)
+    },
+    query: {
+      serverName: stringValue(state.serverName),
+      dbName: stringValue(state.dbName),
+      schema: stringValue(state.schema, "dbo"),
+      fromTable: stringValue(state.fromTable),
+      periodFieldId: stringValue(state.periodFieldId),
+      periodMode: state.periodMode === "manual" ? "manual" : "relative",
+      dateFrom: validIsoDate(state.dateFrom),
+      dateTo: validIsoDate(state.dateTo),
+      periodMonths: finiteInteger(state.periodMonths, 3, 0, 1200),
+      periodDays: finiteInteger(state.periodDays, 0, 0, 36600),
+      periodMonthsFuture: finiteInteger(state.periodMonthsFuture, 0, 0, 1200),
+      periodDaysFuture: finiteInteger(state.periodDaysFuture, 0, 0, 36600),
+      refDepth: finiteInteger(state.refDepth, 5, 1, 5),
+      relationMode: state.relationMode === "warn" ? "warn" : "detail"
+    },
+    view: {
+      search: stringValue(state.search),
+      expanded: booleanMap(state.expanded),
+      visualization: normalizeVisualizationSettings(state.queryGraph)
+    }
+  };
+}
+
+function parseProjectSnapshot(input) {
+  let project = input;
+  if (typeof input === "string") {
+    try {
+      project = JSON.parse(input);
+    } catch {
+      throw new Error("Файл проекта содержит некорректный JSON.");
+    }
+  }
+  if (!project || typeof project !== "object" || Array.isArray(project)) {
+    throw new Error("Некорректный файл проекта.");
+  }
+  if (project.kind !== PROJECT_KIND) throw new Error("Это не проект SQL BI.");
+  if (project.formatVersion !== PROJECT_FORMAT_VERSION) {
+    throw new Error(`Неподдерживаемая версия формата проекта: ${String(project.formatVersion)}.`);
+  }
+
+  const rows = project.structure?.rows;
+  if (!Array.isArray(rows) || !rows.length) throw new Error("В проекте отсутствует структура MXL/XLSX.");
+  const normalizedRows = rows.map((row, index) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error(`Некорректная строка структуры проекта: ${index + 1}.`);
+    }
+    const id = stringValue(row.id);
+    if (!id) throw new Error(`В строке структуры ${index + 1} отсутствует ID.`);
+    return cloneJson(row);
+  });
+
+  const ids = new Set(normalizedRows.map(row => String(row.id)));
+  const selection = plainObject(project.selection);
+  const rawSelected = booleanMap(selection.selected);
+  const synthetic = plainObject(selection.synthetic);
+  const selected = {};
+  const safeSynthetic = {};
+  for (const id of Object.keys(rawSelected)) {
+    if (ids.has(id)) selected[id] = true;
+    else if (synthetic[id] && typeof synthetic[id] === "object" && !Array.isArray(synthetic[id])) {
+      selected[id] = true;
+      safeSynthetic[id] = cloneJson(synthetic[id]);
+    }
+  }
+
+  const query = plainObject(project.query);
+  const view = plainObject(project.view);
+  const periodFieldId = stringValue(query.periodFieldId);
+  return {
+    rows: normalizedRows,
+    selected,
+    metaById: safeSynthetic,
+    boolFilters: Object.fromEntries(Object.entries(boolFilterMap(selection.boolFilters)).filter(([id]) => ids.has(id))),
+    flatten: booleanMap(selection.flatten),
+    expanded: Object.fromEntries(Object.entries(booleanMap(view.expanded)).filter(([id]) => ids.has(id) || own(safeSynthetic, id))),
+    search: stringValue(view.search),
+    serverName: stringValue(query.serverName),
+    dbName: stringValue(query.dbName),
+    schema: stringValue(query.schema, "dbo"),
+    fromTable: stringValue(query.fromTable),
+    periodFieldId: ids.has(periodFieldId) ? periodFieldId : "",
+    periodMode: query.periodMode === "manual" ? "manual" : "relative",
+    dateFrom: validIsoDate(query.dateFrom),
+    dateTo: validIsoDate(query.dateTo),
+    periodMonths: finiteInteger(query.periodMonths, 3, 0, 1200),
+    periodDays: finiteInteger(query.periodDays, 0, 0, 36600),
+    periodMonthsFuture: finiteInteger(query.periodMonthsFuture, 0, 0, 1200),
+    periodDaysFuture: finiteInteger(query.periodDaysFuture, 0, 0, 36600),
+    refDepth: finiteInteger(query.refDepth, 5, 1, 5),
+    relationMode: query.relationMode === "warn" ? "warn" : "detail"
+    ,queryGraph: normalizeVisualizationSettings(view.visualization)
+  };
+}
+
+window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizationSettings };
 })();
 <!-- END GENERATED CANONICAL CORE -->
 </script>
@@ -2431,7 +2603,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
       return Number.isFinite(number) ? Math.max(min,Math.min(max,Math.trunc(number))) : fallback;
     };
     const projectDate = value=>typeof value==="string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
-    const normalizeVisualizationSettings = value=>{ const source=projectPlainObject(value); return {viewMode:["tree","graph","split"].includes(source.viewMode)?source.viewMode:"split",graphFilter:["all","active","sql","errors"].includes(source.graphFilter)?source.graphFilter:"all"}; };
+    const normalizeVisualizationSettings = value=>window.SQLBICanonicalCore.normalizeVisualizationSettings(value);
 
     function createProjectSnapshot(){
       if(!state.rows.length) throw new Error("Сначала загрузите структуру MXL/XLSX.");
@@ -3874,456 +4046,10 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
     function renderQueryPlanPanel(plan){ const status=$("queryPlanStatus"),counts=$("queryPlanCounts"),joins=$("queryPlanJoins"); if(!plan){status.textContent="Ожидание выбора полей.";counts.textContent=joins.textContent="";return;} status.textContent=plan.status==="ready"?(plan.sqlParts&&plan.sqlParts.empty?"Пустой выбор.":"Готово."):`Заблокировано: ${plan.reason}`; counts.textContent=`Поля: ${(plan.selections||[]).length}; связи: ${(plan.joins||[]).length}.`; joins.textContent=(plan.joins||[]).map(join=>join.status==="sql"?join.sql:`${join.status||"blocked"}: ${join.reason||""}`).join("\n"); }
     function renderCanonicalSQL(){ const out=$("sql"),hint=$("sqlHint"),core=window.SQLBICanonicalCore; if(!core||typeof core.generateSql!=="function") throw new Error("Embedded canonical core is unavailable."); const result=core.generateSql(buildCanonicalInputFromState()); state.queryResult=result;state.queryPlan=result.plan;$("selCount").textContent=Object.keys(state.selected).filter(id=>state.selected[id]).length; out.value=result.plan&&result.plan.sqlParts&&result.plan.sqlParts.empty?"-- Выберите хотя бы одно доступное SQL-поле слева":(result.sql||"-- SQL ЗАБЛОКИРОВАН"); hint.textContent=result.hint||"";hint.style.display=result.hint?"block":"none";renderDiagnostics(result.diagnostics||[]);renderQueryPlanPanel(result.plan);queueMicrotask(syncExportButtons);return result; }
     function renderSQL(){
-      const result = renderCanonicalSQL(); renderQueryGraph(); return result;
-      /* Legacy independent SQL/JOIN renderer below is unreachable during migration. */
-      const out = $("sql"); const hint = $("sqlHint"); hint.style.display="none"; hint.textContent="";
-      queueMicrotask(syncExportButtons);
-      const diag = Object.values(state.referenceDiagnostics||{});
-      const requestedIds = Object.keys(state.selected).filter(id=>state.selected[id]);
-      Object.keys(state.boolFilters||{}).filter(id=>{
-        const value = state.boolFilters[id]||{};
-        return (value.yes || value.no) && !requestedIds.includes(id);
-      }).forEach(id=>{
-        const nd = nodeData(id);
-        const name = nd && nd.row ? (nd.row.title||nd.row.object||nd.row.internal||id) : id;
-        diag.push(`Булевый фильтр ${name} не применён: поле не выбрано в SELECT и не входит в разрешённый контекст.`);
-      });
-      const rejectedIds = requestedIds.filter(id=>!isSelectableNodeId(id));
-      rejectedIds.forEach(id=>delete state.selected[id]);
-      if(rejectedIds.length){
-        const names = rejectedIds.map(id=>{
-          const nd=nodeData(id);
-          return nd ? (nd.row.internal || nd.row.object || id) : id;
-        });
-        diag.push(`Исключены недоступные структурные узлы: ${names.join(", ")}.`);
-      }
-      const selectedIds = requestedIds.filter(id=>isSelectableNodeId(id));
-      $("selCount").textContent = selectedIds.length;
-      if(selectedIds.length===0){
-        out.value="-- Выберите хотя бы одно доступное SQL-поле слева";
-        renderDiagnostics(diag);
-        return;
-      }
-
-      const selectedOrig = selectedIds.filter(id=>state.byId[id]).map(id=>state.byId[id]);
-      const selectedSynth = [];
-      selectedIds.filter(id=>!state.byId[id]).map(id=>({ id, ...(state.metaById[id]||{}) })).filter(m=>m && m.field).forEach(m=>{
-        const check = validateJoinChain(m.chain);
-        if(check.ok){ selectedSynth.push(m); return; }
-        delete state.selected[m.id];
-        if(check.status==="cycle") diag.push(`Циклическая цепочка для ${m.displayPath||m.id} заблокирована. JOIN не сформирован.`);
-        else if(check.status==="max_depth") diag.push(`Цепочка для ${m.displayPath||m.id} превышает максимальную глубину ${maxRefDepth()} и заблокирована.`);
-        else diag.push(`Небезопасная цепочка для ${m.displayPath||m.id} заблокирована (${check.reason}). JOIN не сформирован.`);
-      });
-      const originSortKey = row=>{
-        const table = tableFor(row);
-        return `${normalizedPhysicalName(table && (table.internal||table.object))}|${String(row && row.id || "")}`;
-      };
-      selectedOrig.sort((a,b)=>originSortKey(a).localeCompare(originSortKey(b)));
-      selectedSynth.sort((a,b)=>{
-        const aBase = state.byId[a.baseTopId], bBase = state.byId[b.baseTopId];
-        const aKey = `${originSortKey(aBase)}|${chainText(a.chain)}|${a.id}`;
-        const bKey = `${originSortKey(bBase)}|${chainText(b.chain)}|${b.id}`;
-        return aKey.localeCompare(bKey);
-      });
-      $("selCount").textContent = selectedOrig.length + selectedSynth.length;
-      if(selectedOrig.length + selectedSynth.length === 0){
-        out.value="-- Выберите хотя бы одно доступное SQL-поле слева";
-        renderDiagnostics(diag);
-        return;
-      }
-
-      const db = state.dbName.trim(), sch = state.schema.trim();
-      const qn=(t)=> qname(db, sch, t);
-      const selectionItems = [
-        ...selectedOrig.map(row=>({ kind:"orig", id:row.id, row })),
-        ...selectedSynth.map(meta=>({ kind:"synth", id:meta.id, row:meta.field, meta }))
-      ];
-      const selectionContext = resolveSelectionContext(selectionItems, {
-        database:db, schema:sch, manualFrom:state.fromTable.trim(),
-        byId:state.byId, tableFor, resolveTablePartHeaderJoin
-      });
-      if(!selectionContext.valid){
-        out.value = "-- SQL ЗАБЛОКИРОВАН: выбраны поля из независимых физических таблиц";
-        hint.textContent = "Выбраны поля из независимых физических таблиц. Автоматическое объединение заблокировано. Оставьте поля одного объекта либо подтверждённой связки шапка–табличная часть.";
-        hint.style.display = "block";
-        (selectionContext.diagnostics||[]).forEach(message=>diag.push(message));
-        renderDiagnostics(diag);
-        return;
-      }
-      const addSelectColumn = (cols, usedAliases, expression, baseName, context)=>{
-        if(!expression){
-          diag.push(`Поле ${context||"без имени"} пропущено: отсутствует безопасное SQL-имя колонки.`);
-          return false;
-        }
-        const alias = makeUniqueColumnAlias(baseName, usedAliases);
-        if(!alias){
-          diag.push(`Поле ${context||"без имени"} пропущено: невозможно сформировать выходной алиас.`);
-          return false;
-        }
-        cols.push(`${expression} AS ${alias}`);
-        return true;
-      };
-
-      const periodField = state.periodFieldId ? (state.byId[state.periodFieldId] || null) : null;
-      const periodPreview = buildSelectedPeriodRange("__DATE__");
-      const periodFieldAvailable = !!periodField && selectedOrig.some(r=>r.id===periodField.id) && isDateField(periodField);
-      (periodPreview.diagnostics||[]).forEach(message=>diag.push(message));
-      if(periodPreview.description) diag.push(periodPreview.description);
-      if((periodPreview.active || periodPreview.requested) && !periodFieldAvailable){
-        if(!periodField) diag.push("Период не применён: поле периода не выбрано.");
-        else diag.push("Период не применён: поле периода нельзя безопасно использовать в текущем контексте.");
-      }
-
-      // if explicit fromTable
-      if(state.fromTable.trim()){
-        const A="F";
-        const joins = [];
-        let refN=1;
-        const joinMap = {};
-
-        const ensureJoin = (parentAlias, step)=>{
-          const refInternal = String(step.refInternal||"");
-          const targetTable = String(step.targetTable||"");
-          const check = validateJoinChain([step]);
-          if(!check.ok){
-            diag.push(`JOIN ${parentAlias}.${quoteIdentifier(refInternal)||"<без имени>"} -> ${targetTable||"<без имени>"} заблокирован (${check.reason}).`);
-            return null;
-          }
-          const refColumn = qualifiedColumn(parentAlias, refInternal);
-          const targetName = qn(targetTable);
-          if(!refColumn || !targetName){
-            diag.push(`JOIN ${parentAlias} -> ${targetTable||"<без имени>"} заблокирован: отсутствует безопасный SQL-идентификатор.`);
-            return null;
-          }
-          const key = `${parentAlias}.${refInternal}->${targetTable}`;
-          if(joinMap[key]) return joinMap[key];
-          const alias = "R"+(refN++);
-          joinMap[key]=alias;
-          joins.push(`LEFT JOIN ${targetName} AS ${alias} ON ${qualifiedColumn(alias, "_IDRRef")} = ${refColumn}`);
-          return alias;
-        };
-
-        const cols = [];
-        const usedAliases = new Set();
-        const wheres = [];
-        let orderBy = "";
-
-        // original selections
-        selectedOrig.forEach(r=>{
-          const col = r.internal || r.object;
-          addSelectColumn(cols, usedAliases, castExpr(A, col, r.type, diag, r.title||r.object||r.internal), outputAliasBase(r), r.title||r.object||r.internal);
-
-          const v = boolFilterValueForId(r.id);
-          if(v!==null && isBoolType(r.type)){
-            const filterExpr = castExpr(A, col, r.type, diag, r.title||r.object||r.internal);
-            if(filterExpr) wheres.push(`${filterExpr} = ${v}`);
-            else diag.push(`Фильтр ${r.title||r.object||r.id} пропущен: отсутствует безопасное SQL-имя колонки.`);
-          }
-        });
-
-        // synthetic selections (chain)
-        selectedSynth.forEach(m=>{
-          const baseTop = state.byId[m.baseTopId];
-          if(!baseTop) return;
-          let curAlias = A;
-          for(const step of m.chain){
-            curAlias = ensureJoin(curAlias, step);
-            if(!curAlias) break;
-          }
-          if(!curAlias) return;
-          const col = m.field.internal || m.field.object;
-          addSelectColumn(cols, usedAliases, castExpr(curAlias, col, m.field.type, diag, m.displayPath||m.id), outputAliasBase(m.field, m.displayPath), m.displayPath||m.id);
-          const v = boolFilterValueForId(m.id);
-          if(v!==null && isBoolType(m.field.type)){
-            const filterExpr = castExpr(curAlias, col, m.field.type, diag, m.displayPath||m.id);
-            if(filterExpr) wheres.push(`${filterExpr} = ${v}`);
-            else diag.push(`Фильтр ${m.displayPath||m.id} пропущен: отсутствует безопасное SQL-имя колонки.`);
-          }
-        });
-
-        // period filter
-        if(periodPreview.active && periodFieldAvailable){
-          const col = periodField.internal || periodField.object;
-          const dateExpr = sqlDateExpr(A, col, periodField.type);
-          if(dateExpr){
-            const range = buildSelectedPeriodRange(dateExpr);
-            wheres.push(...range.conditions);
-            orderBy = `${dateExpr} DESC`;
-          } else diag.push("Период не применён: отсутствует безопасное SQL-имя поля даты.");
-        }
-        const fromName = qn(state.fromTable.trim());
-        if(!fromName || !cols.length){
-          out.value = "-- SQL не сформирован: проверьте имена таблицы и выбранных полей";
-          diag.push(!fromName ? "Ручной FROM не сформирован: отсутствует безопасное имя таблицы." : "SELECT не сформирован: нет колонок с безопасными именами и алиасами.");
-          renderDiagnostics(diag);
-          return;
-        }
-        const lines = [
-          "SELECT",
-          "  " + cols.join(",\n  "),
-          "FROM  " + fromName + " AS " + A
-        ];
-        if(joins.length) lines.push(...joins);
-        if(wheres.length) lines.push("WHERE " + wheres.join(" AND "));
-        if(orderBy) lines.push("ORDER BY " + orderBy);
-
-        out.value = lines.join("\n");
-        renderDiagnostics(diag);
-        return;
-      }
-
-      // Buckets by doc prefix
-      const buckets = new Map();
-      function addToBucket(baseRow, origRow, synthMeta){
-        const tblNode = tableFor(baseRow);
-        const table = String((tblNode && (tblNode.internal||tblNode.object))||"");
-        const prefix = getDocPrefix(table);
-        const key = prefix || table || "__unknown__";
-        const b = buckets.get(key) || { origRows:[], synthRows:[], tables:new Set(), prefix };
-        if(origRow) b.origRows.push(origRow);
-        if(synthMeta) b.synthRows.push(synthMeta);
-        if(table) b.tables.add(table);
-        buckets.set(key,b);
-      }
-
-      selectedOrig.forEach(r=>addToBucket(r, r, null));
-      selectedSynth.forEach(m=>{
-        const baseTop = state.byId[m.baseTopId];
-        if(baseTop) addToBucket(baseTop, null, m);
-      });
-
-      if(buckets.size===1 && buckets.has("__unknown__")){
-        hint.textContent = "Не удалось определить таблицу. Укажите поле «FROM — таблица», тогда SQL будет сформирован точно.";
-        hint.style.display = "block";
-        out.value = "-- Укажите FROM в настройках.";
-        renderDiagnostics(["Таблица для выбранных полей не определена автоматически."]);
-        return;
-      }
-
-      function buildFor(b, baseTable, includeHeader){
-        const H="H", T="T";
-        const tables = Array.from(b.tables);
-        const header = b.prefix && tables.find(t=> !isVTTableName(t) && (getDocPrefix(t)||"").toLowerCase()===b.prefix.toLowerCase()) || null;
-        const needJoinHeader = includeHeader && header && baseTable!==header;
-
-        const refJoins = {};
-        const joinKeys = new Set();
-        let refN = 1;
-        const joinLines = [];
-
-        const ensureJoin = (parentAlias, step)=>{
-          const refInternal = String(step.refInternal||"");
-          const targetTable = String(step.targetTable||"");
-          const check = validateJoinChain([step]);
-          if(!check.ok){
-            diag.push(`JOIN ${parentAlias}.${quoteIdentifier(refInternal)||"<без имени>"} -> ${targetTable||"<без имени>"} заблокирован (${check.reason}).`);
-            return null;
-          }
-          const refColumn = qualifiedColumn(parentAlias, refInternal);
-          const targetName = qn(targetTable);
-          if(!refColumn || !targetName){
-            diag.push(`JOIN ${parentAlias} -> ${targetTable||"<без имени>"} заблокирован: отсутствует безопасный SQL-идентификатор.`);
-            return null;
-          }
-          const key = physicalJoinKey("reference", parentAlias, refInternal, targetTable, "_IDRRef");
-          if(refJoins[key]) return refJoins[key];
-          const alias = "R"+(refN++);
-          refJoins[key]=alias;
-          joinKeys.add(key);
-          joinLines.push(`LEFT JOIN ${targetName} AS ${alias} ON ${qualifiedColumn(alias, "_IDRRef")} = ${refColumn}`);
-          return alias;
-        };
-
-        function aliasForRow(r){
-          const t = tableFor(r); const tname = String((t && (t.internal||t.object))||"");
-          if(header && tname===header) return H;
-          return T;
-        }
-
-        // columns
-        const cols = [];
-        const usedAliases = new Set();
-        const wheres = [];
-        let orderBy = "";
-
-        // original selected rows for this part
-        b.origRows.forEach(r=>{
-          const t = tableFor(r); const tname = String((t && (t.internal||t.object))||"");
-          const inThis = (baseTable===header) ? (tname===header) : (tname===baseTable || (includeHeader && header && tname===header));
-          if(!inThis) return;
-          const src = (header && tname===header) ? H : T;
-          const col = r.internal || r.object;
-          addSelectColumn(cols, usedAliases, castExpr(src, col, r.type, diag, r.title||r.object||r.internal), outputAliasBase(r), r.title||r.object||r.internal);
-          const v = boolFilterValueForId(r.id);
-          if(v!==null && isBoolType(r.type)){
-            const filterExpr = castExpr(src, col, r.type, diag, r.title||r.object||r.internal);
-            if(filterExpr) wheres.push(`${filterExpr} = ${v}`);
-            else diag.push(`Фильтр ${r.title||r.object||r.id} пропущен: отсутствует безопасное SQL-имя колонки.`);
-          }
-        });
-
-        // synthetic selected rows for this part
-        b.synthRows.forEach(m=>{
-          const baseTop = state.byId[m.baseTopId];
-          if(!baseTop) return;
-          const tBase = tableFor(baseTop); const tnameBase = String((tBase && (tBase.internal||tBase.object))||"");
-          const inThis = (baseTable===header) ? (tnameBase===header) : (tnameBase===baseTable || (includeHeader && header && tnameBase===header));
-          if(!inThis) return;
-
-          let curAlias = (header && tnameBase===header) ? H : T;
-          for(const step of m.chain){
-            curAlias = ensureJoin(curAlias, step);
-            if(!curAlias) break;
-          }
-          if(!curAlias) return;
-          const col = m.field.internal || m.field.object;
-          addSelectColumn(cols, usedAliases, castExpr(curAlias, col, m.field.type, diag, m.displayPath||m.id), outputAliasBase(m.field, m.displayPath), m.displayPath||m.id);
-          const v = boolFilterValueForId(m.id);
-          if(v!==null && isBoolType(m.field.type)){
-            const filterExpr = castExpr(curAlias, col, m.field.type, diag, m.displayPath||m.id);
-            if(filterExpr) wheres.push(`${filterExpr} = ${v}`);
-            else diag.push(`Фильтр ${m.displayPath||m.id} пропущен: отсутствует безопасное SQL-имя колонки.`);
-          }
-        });
-
-        const lines = ["SELECT","  " + cols.join(",\n  ")];
-
-        const baseName = qn(baseTable);
-        const headerName = header ? qn(header) : null;
-        if(!baseName || (header && !headerName)){
-          diag.push(`SELECT по ${baseTable||"таблице без имени"} не сформирован: отсутствует безопасное имя таблицы.`);
-          return null;
-        }
-        if(!cols.length){
-          diag.push(`SELECT по ${baseTable} не сформирован: нет колонок с безопасными именами и алиасами.`);
-          return null;
-        }
-
-        if(baseTable===header) lines.push(`FROM  ${headerName} AS ${H}`);
-        else if(needJoinHeader){
-          lines.push(`FROM  ${baseName} AS ${T}`);
-          {
-            const resolution = resolveTablePartHeaderJoin(baseTable, { expectedHeaderTable:header });
-            if(!resolution.matched || !resolution.unambiguous){
-              (resolution.diagnostics||[]).forEach(message=>diag.push(message));
-              (resolution.candidates||[]).forEach(candidate=>diag.push(`Кандидат связи: ${joinCandidateLabel(candidate)}.`));
-              return null;
-            }
-            const vtJoinColumn = qualifiedColumn(T, resolution.detailForeignKeyColumn);
-            const headerIdColumn = qualifiedColumn(H, resolution.headerKeyColumn);
-            const safeResolvedHeaderName = qn(resolution.headerTable);
-            if(!vtJoinColumn || !headerIdColumn || !safeResolvedHeaderName){
-              diag.push(`JOIN шапки ${baseTable} -> ${header} не сформирован: отсутствует безопасный SQL-идентификатор.`);
-              return null;
-            }
-            const key = physicalJoinKey("table_part_header", resolution.detailTable, resolution.detailForeignKeyColumn, resolution.headerTable, resolution.headerKeyColumn);
-            if(!joinKeys.has(key)){
-              joinKeys.add(key);
-              lines.push(`LEFT JOIN ${safeResolvedHeaderName} AS ${H} ON ${vtJoinColumn} = ${headerIdColumn}`);
-            }
-          }
-        } else {
-          lines.push(`FROM  ${baseName} AS ${T}`);
-        }
-
-        // joins
-        joinLines.forEach(j=>lines.push(j));
-        // period filter only if the period field belongs to this part
-        const df = periodField;
-        if(periodPreview.active && periodFieldAvailable && df){
-          const tdf = tableFor(df); const tnameDf = String((tdf && (tdf.internal||tdf.object))||"");
-          const srcDF = (header && tnameDf===header) ? H : T;
-          const col = df.internal||df.object;
-          const belongsToSelect = baseTable===header
-            ? tnameDf===header
-            : (tnameDf===baseTable || (includeHeader && header && tnameDf===header));
-          if(belongsToSelect){
-            const dateExpr = sqlDateExpr(srcDF, col, df.type);
-            if(dateExpr){
-              const range = buildSelectedPeriodRange(dateExpr);
-              wheres.push(...range.conditions);
-              orderBy = `${dateExpr} DESC`;
-            } else diag.push(`Период не применён к SELECT по ${baseTable}: отсутствует безопасное SQL-имя поля даты.`);
-          } else {
-            diag.push(`Период не применён к SELECT по ${baseTable}: поле даты принадлежит ${tnameDf||"другой таблице"}.`);
-          }
-        }
-
-        if(wheres.length) lines.push("WHERE " + wheres.join(" AND "));
-        if(orderBy) lines.push("ORDER BY " + orderBy);
-
-        return lines.join("\n");
-      }
-
-      const parts = [];
-      const addPart = value=>{ if(value) parts.push(value); };
-      for(const b of buckets.values()){
-        const tables = Array.from(b.tables);
-        const header = b.prefix && tables.find(t=> !isVTTableName(t) && (getDocPrefix(t)||"").toLowerCase()===b.prefix.toLowerCase()) || null;
-        const rest = tables.filter(t=>t!==header);
-
-        // need header if any original row OR baseTop for synth is in header
-        const needHeaderCols = header && (
-          b.origRows.some(r=>{
-            const t=tableFor(r); const tname=String((t&&(t.internal||t.object))||"");
-            return tname===header;
-          }) ||
-          b.synthRows.some(m=>{
-            const baseTop = state.byId[m.baseTopId];
-            if(!baseTop) return false;
-            const t=tableFor(baseTop); const tname=String((t&&(t.internal||t.object))||"");
-            return tname===header;
-          })
-        );
-
-        if(tables.length===1){
-          diag.push(`Базовая таблица: ${tables[0]}`);
-          addPart(buildFor(b, tables[0], false));
-        } else if(header){
-          // После resolveSelectionContext здесь возможна только одна подтверждённая
-          // связка H–T. Она всегда формирует один SQL; две T сюда не попадут.
-          const detail = rest.find(isVTTableName);
-          if(detail){
-            diag.push(`Подтверждённый контекст H–T: ${header} + ${detail}. Строки табличной части сохраняются, поля шапки повторяются.`);
-            addPart(buildFor(b, detail, true));
-          } else {
-            addPart(buildFor(b, header, false));
-          }
-        } else {
-          if(tables.length>1) diag.push(`В одной группе несколько таблиц без явной шапки: ${tables.join(", ")}. Проверьте связи вручную.`);
-          tables.forEach(t=>{
-            diag.push(`Базовая таблица: ${t}`);
-            addPart(buildFor(b, t, false));
-          });
-        }
-      }
-
-      out.value = parts.length
-        ? parts.join("\n\n-- ##############################################################\n\n")
-        : "-- SQL не сформирован: проверьте имена таблиц и выбранных полей";
-      const selectedTables = new Set();
-      selectedOrig.forEach(r=>{
-        const t = tableFor(r);
-        if(t) selectedTables.add(String(t.internal||t.object||""));
-      });
-      selectedSynth.forEach(m=>{
-        if((m.chain||[]).length > 1){
-          diag.push(`Глубокая цепочка справочников (${m.chain.length}): ${chainText(m.chain)}. Проверьте, что это 1:1, иначе возможны размножения строк.`);
-        }
-      });
-      const vtCount = Array.from(selectedTables).filter(isVTTableName).length;
-      if(vtCount > 1){
-        diag.push(`Выбрано несколько табличных частей (${vtCount}). Это может быть связь 1:N или независимые SELECT; не используйте DISTINCT, если нужна детализация.`);
-      }
-      if(state.relationMode === "warn"){
-        diag.push(`Режим 1:N: только предупреждения. SQL не агрегирует строки и сохраняет текущую детализацию.`);
-      } else {
-        diag.push(`Режим 1:N: сохранять строки. Для агрегации ИНЗ/заявок лучше делать отдельный режим STRING_AGG в следующей версии.`);
-      }
-      renderDiagnostics(diag);
+      const result = renderCanonicalSQL();
+      renderQueryGraph();
+      return result;
     }
-
     // UI handlers
     //$("btn-load").onclick = ()=> $("xlsx").click();
     $("btn-clear").onclick = ()=>{
@@ -4581,20 +4307,6 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql };
 
     // Диагностический API не меняет интерфейс приложения и используется только
     // локальной автоматической регрессией portable HTML.
-    window.__SQLBI_TEST__ = {
-      state, buildTree, importRows, rowsFromMxlText, rowsFromMxlBuffer,
-      bytesFromBase64, inflateRaw, rowsFromValueStorageText, rowsFromValueStorageXmlBuffer, isSelectableField,
-      resolveReferenceTarget, validateJoinChain, quoteIdentifier, qname,
-      parseNumericType, castExpr, sqlDateExpr, buildRelativeDateRange,
-      parseIsoCalendarDate, buildManualDateRange, resolveTablePartHeaderJoin,
-      physicalJoinKey, tablePartOwnerName, getDocPrefix, isVTTableName,
-      selectionObjectDescriptor, resolveSelectionContext,
-      createProjectSnapshot, parseProjectSnapshot, applyProjectSnapshot,
-      hasGeneratedSql, safeSqlFilePart, sqlExportFileName, createSqlExport,
-      escapePowerQueryText, createPowerQuery, createPowerQueryExport,
-      renderSQL
-    };
-
     // init
     renderTree(); renderSQL();
   })();

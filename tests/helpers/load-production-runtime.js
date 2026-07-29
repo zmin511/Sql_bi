@@ -138,50 +138,27 @@ function applicationScriptFromHtml(html) {
   return scripts.at(-1);
 }
 
-export function loadProductionRuntime(indexPath = "index.html") {
+function instrumentApplicationSource(source) {
+  const anchor = "\n  })();";
+  const anchorIndex = source.lastIndexOf(anchor);
+  if (anchorIndex < 0 || source.indexOf(anchor, anchorIndex + anchor.length) !== -1) throw new Error("Не найден единственный стабильный anchor завершения application IIFE.");
+  const hooks = `\n    window.__SQLBI_TEST__ = { state, normalizeHeader, rowsFromTableObjects, importRows, buildTree, tableFor, isSelectableField, isReferenceField, getDocPrefix, isVTTableName, parseNumericType, castExpr, sqlDateExpr, buildRelativeDateRange, buildManualDateRange, resolveTablePartHeaderJoin, resolveSelectionContext, quoteIdentifier, qname, qualifiedColumn, stableAliasHash, fitColumnAlias, makeUniqueColumnAlias, outputAliasBase, referenceTypeParts, referenceRootMask, resolveReferenceTarget, validateJoinChain, chainHasTarget, chainText, synthId, renderTree, renderDiagnostics, makeRefChildrenFor, maxRefDepth, nodeData, buildCanonicalInputFromState, renderCanonicalSQL, renderQueryPlanPanel, buildQueryGraphModel, renderQueryGraph, createProjectSnapshot, parseProjectSnapshot, applyProjectSnapshot, normalizeVisualizationSettings, createPowerQuery, createPowerQueryExport, renderSQL, setReferenceDepthForTest: value => { state.refDepth = value; } };\n`;
+  return `${source.slice(0, anchorIndex)}${hooks}${source.slice(anchorIndex)}`;
+}
+
+export function loadProductionRuntime(options = "index.html") {
+  const config = typeof options === "string" ? { indexPath: options, instrument: true } : { indexPath: "index.html", instrument: true, ...options };
+  const indexPath = config.indexPath;
   const html = fs.readFileSync(indexPath, "utf8");
   let source = applicationScriptFromHtml(html);
   const canonicalSource = (html.match(/<!-- BEGIN GENERATED CANONICAL CORE -->\s*[\s\S]*?SQLBI_CANONICAL_MANIFEST [^\n]*\n([\s\S]*?)<!-- END GENERATED CANONICAL CORE -->/) || [])[1] || "";
 
-  const diagnosticApiMarker = "window.__SQLBI_TEST__ = {";
-  if (!source.includes(diagnosticApiMarker)) {
-    throw new Error("В production HTML отсутствует диагностический API.");
-  }
+  if (config.instrument) source = instrumentApplicationSource(source);
+  const { sandbox: runtimeSandbox, elements: runtimeElements } = createBrowserSandbox();
+  if (canonicalSource) vm.runInNewContext(canonicalSource, runtimeSandbox, { filename: indexPath, timeout: 5000 });
+  vm.runInNewContext(source, runtimeSandbox, { filename: indexPath, timeout: 5000 });
+  if (config.instrument && !runtimeSandbox.__SQLBI_TEST__) throw new Error("Инструментированный production runtime не опубликовал VM-only hooks.");
+  if (!config.instrument && runtimeSandbox.__SQLBI_TEST__) throw new Error("Неинструментированный production runtime опубликовал test API.");
+  return { api: runtimeSandbox.__SQLBI_TEST__ || null, elements: runtimeElements, html, source, canonicalCore: runtimeSandbox.SQLBICanonicalCore || null, runtime: runtimeSandbox };
 
-  // Expose selected non-public functions only in the VM copy used by tests.
-  source = source.replace(
-    diagnosticApiMarker,
-    `${diagnosticApiMarker}
-      normalizeHeader, rowsFromTableObjects, importRows, tableFor,
-      qualifiedColumn, stableAliasHash, fitColumnAlias,
-      makeUniqueColumnAlias, outputAliasBase,
-      referenceTypeParts, referenceRootMask, resolveReferenceTarget,
-      validateJoinChain, chainHasTarget, chainText, synthId,
-      renderTree, renderDiagnostics, makeRefChildrenFor, maxRefDepth,
-      isReferenceField, nodeData, buildCanonicalInputFromState,
-      renderCanonicalSQL, renderQueryPlanPanel, buildQueryGraphModel,
-      renderQueryGraph, createProjectSnapshot, parseProjectSnapshot, applyProjectSnapshot, normalizeVisualizationSettings,
-      setReferenceDepthForTest: value => { state.refDepth = value; },`
-  );
-
-  const { sandbox, elements } = createBrowserSandbox();
-
-  if (canonicalSource) vm.runInNewContext(canonicalSource, sandbox, { filename: indexPath, timeout: 5000 });
-
-  vm.runInNewContext(source, sandbox, {
-    filename: indexPath,
-    timeout: 5000
-  });
-
-  if (!sandbox.__SQLBI_TEST__) {
-    throw new Error("Production runtime не опубликовал window.__SQLBI_TEST__.");
-  }
-
-  return {
-    api: sandbox.__SQLBI_TEST__,
-    elements,
-    html,
-    source,
-    canonicalCore: sandbox.SQLBICanonicalCore || null
-  };
 }
