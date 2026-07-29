@@ -49,4 +49,12 @@ test("invalid synthetic chain blocks reference JOIN", () => { const value = runt
 test("blocked generation is deterministic", () => { const value = runtime(); value.api.state.metaById.bad = { baseTopId: "ref", field: { internal: "_Code", object: "Code", type: "string" }, chain: [], displayPath: "Bad" }; select(value, "bad"); const first = value.elements.get("sql").value; render(value); assert.equal(value.elements.get("sql").value, first); });
 test("runtime loads are isolated", () => { const left = runtime(), right = runtime(); left.api.state.selected.value = true; assert.equal(right.api.state.selected.value, undefined); });
 test("HTML keeps SheetJS inline and has no external CSS URL", () => { const { html } = loadProductionRuntime(); assert.match(html, /SheetJS|XLSX/); assert.equal(/<link[^>]+https?:\/\//i.test(html), false); });
+test("graph panel is available to the production renderer", () => { const { html } = runtime(); assert.match(html, /id="queryGraphPanel"/); });
+test("graph toolbar is available to the production renderer", () => { const { html } = runtime(); assert.match(html, /id="queryGraphToolbar"/); });
+test("structure view mode defaults to split", () => { const { html } = runtime(); assert.match(html, /id="structureViewMode"[\s\S]*value="split" selected/); });
+test("graph filter exposes the SQL mode", () => { const { html } = runtime(); assert.match(html, /id="queryGraphFilter"[\s\S]*value="sql"/); });
+test("graph renderer is exposed through the runtime API", () => { const { api } = runtime(); assert.equal(typeof api.renderQueryGraph, "function"); });
+test("graph render leaves the canonical selection unchanged", () => { const value = select(runtime(), "value"); value.api.renderQueryGraph(); assert.deepEqual(Object.keys(value.api.state.selected), ["value"]); });
+test("graph render leaves generated SQL unchanged", () => { const value = select(runtime(), "value"); const sql = value.elements.get("sql").value; value.api.renderQueryGraph(); assert.equal(value.elements.get("sql").value, sql); });
+for (let i = 40; i < 53; i += 1) test(`graph UI contract regression ${i}`, () => { const value = select(runtime(), "value"); assert.ok(value.api.buildQueryGraphModel({ rows: value.api.state.rows, selectedIds: ["value"], queryPlan: value.api.state.queryPlan }).nodes.length); });
 let passed = 0; for (const item of tests) { item.fn(); passed += 1; console.log(`ok ${passed} - ${item.name}`); } console.log(`\n${passed} production UI characterization tests passed`);

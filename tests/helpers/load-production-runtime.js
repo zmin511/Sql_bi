@@ -159,7 +159,8 @@ export function loadProductionRuntime(indexPath = "index.html") {
       validateJoinChain, chainHasTarget, chainText, synthId,
       renderTree, renderDiagnostics, makeRefChildrenFor, maxRefDepth,
       isReferenceField, nodeData, buildCanonicalInputFromState,
-      renderCanonicalSQL, renderQueryPlanPanel,
+      renderCanonicalSQL, renderQueryPlanPanel, buildQueryGraphModel,
+      renderQueryGraph,
       setReferenceDepthForTest: value => { state.refDepth = value; },`
   );
 
