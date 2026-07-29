@@ -156,6 +156,8 @@ export function loadProductionRuntime(indexPath = "index.html") {
       makeUniqueColumnAlias, outputAliasBase,
       referenceTypeParts, referenceRootMask, resolveReferenceTarget,
       validateJoinChain, chainHasTarget, chainText, synthId,
+      renderTree, renderDiagnostics, makeRefChildrenFor, maxRefDepth,
+      isReferenceField, nodeData,
       setReferenceDepthForTest: value => { state.refDepth = value; },`
   );
 
