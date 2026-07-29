@@ -1,6 +1,7 @@
 import { castExpr } from "./casts.js";
 import { buildManualDateRange, buildRelativeDateRange, sqlDateExpr } from "./dates.js";
 import { validateRelationshipForSql } from "./relationships.js";
+import { validateJoinChain } from "./references.js";
 import { resolveSelectionContext } from "./selectionContext.js";
 import { tableFor } from "./tableDetect.js";
 import { isBoolType, isDateField } from "./types.js";
@@ -104,10 +105,58 @@ export function generateSql(input) {
   }
 
   const selectedOrig = selectedIds.filter(id => byId[id]).map(id => byId[id]);
-  const selectedSynth = selectedIds.filter(id => !byId[id])
-    .map(id => ({ id, ...(metaById[id] || {}) }))
-    .filter(item => item && item.field);
+  const selectedSynth = [];
   const diagnostics = [];
+
+  for (const id of selectedIds.filter(selectedId => !byId[selectedId])) {
+    const meta = metaById[id];
+
+    if (!meta || typeof meta !== "object") {
+      diagnostics.push(
+        `Synthetic selection blocked for ${id}: missing_metadata / selected_meta_not_found.`
+      );
+
+      return {
+        sql: "",
+        diagnostics,
+        hint: "SQL not generated: selected synthetic metadata is missing."
+      };
+    }
+
+    if (!meta.field || typeof meta.field !== "object") {
+      diagnostics.push(
+        `Synthetic selection blocked for ${id}: malformed_metadata / missing_field.`
+      );
+
+      return {
+        sql: "",
+        diagnostics,
+        hint: "SQL not generated: selected synthetic metadata is malformed."
+      };
+    }
+
+    const normalizedMeta = { ...meta, id };
+    const validation = validateJoinChain(normalizedMeta.chain, {
+      rows,
+      maxDepth: input.refDepth
+    });
+
+    if (!validation.ok) {
+      diagnostics.push(
+        `Reference chain blocked for ${id}: ` +
+        `${validation.status || "unknown"} / ${validation.reason || "invalid_chain"}.`
+      );
+
+      return {
+        sql: "",
+        diagnostics,
+        hint: "SQL not generated: selected reference chain is not valid."
+      };
+    }
+
+    selectedSynth.push(normalizedMeta);
+  }
+
   const db = String(input.dbName || "").trim();
   const schema = String(input.schema || "").trim();
   const selectionContext = resolveSelectionContext([

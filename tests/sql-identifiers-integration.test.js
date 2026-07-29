@@ -111,16 +111,42 @@ console.log("extended SQL identifier integration coverage passed");
 {
   const base = { id: "base", internal: "_Document100", object: "Base", parentId: null };
   const original = { ...field("o", "Обычное]", "Same"), parentId: "base" };
-  const synthetic = { id: "s", field: { internal: "Цель]", object: "Same", title: "Same" }, displayPath: "Same", baseTopId: "base", chain: [{ refInternal: "Источник]", targetTable: "_Reference45" }] };
+  const targetRoot = { id: "target-root", internal: "_Reference45", object: "Target", parentId: null };
+  const synthetic = {
+    id: "s",
+    field: { internal: "Цель]", object: "Same", title: "Same" },
+    displayPath: "Same",
+    baseTopId: "base",
+    chain: [{
+      refInternal: "Источник]",
+      targetTable: "_Reference45",
+      targetKind: "reference"
+    }]
+  };
   const options = { fromTable: "Manual", dbName: "UMC", metaById: { s: synthetic } };
-  const result = generateSql(input([base, original], { s: true, o: true }, options));
-  const repeat = generateSql(input([base, original], { s: true, o: true }, options));
+  const fixtureRows = [base, original, targetRoot];
+  const result = generateSql(input(fixtureRows, { s: true, o: true }, options));
+  const repeat = generateSql(input(fixtureRows, { s: true, o: true }, options));
   assert.equal(result.sql, repeat.sql); assert.deepEqual(result.diagnostics, repeat.diagnostics);
   assert.ok(result.sql.includes("LEFT JOIN [UMC].[dbo].[_Reference45] AS R1 ON R1.[_IDRRef] = F.[Источник]]]"));
   assert.ok(result.sql.includes("F.[Обычное]]] AS [Same]"));
   assert.ok(result.sql.includes("R1.[Цель]]] AS [Same (2)]"));
-  const broken = generateSql(input([base], { s: true }, { fromTable: "Manual", dbName: "UMC", metaById: { s: { ...synthetic, chain: [{ refInternal: "Источник]", targetTable: " " }] } } }));
-  assert.equal(broken.sql, ""); assert.ok(broken.diagnostics.some(item => item.includes("JOIN reference")));
+  const broken = generateSql(input([base, targetRoot], { s: true }, {
+    fromTable: "Manual",
+    dbName: "UMC",
+    metaById: {
+      s: {
+        ...synthetic,
+        chain: [{
+          refInternal: "Источник]",
+          targetTable: " ",
+          targetKind: "reference"
+        }]
+      }
+    }
+  }));
+  assert.equal(broken.sql, "");
+  assert.ok(broken.diagnostics.some(item => item.includes("invalid_target_table")));
 }
 
 {

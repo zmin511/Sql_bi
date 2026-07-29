@@ -125,7 +125,8 @@ function noSql(result) {
 {
   const rows = [
     { id: "d", internal: "_Document100", object: "Document", parentId: null },
-    { id: "f", internal: "_Fld100RRef", object: "Customer", parentId: "d" }
+    { id: "f", internal: "_Fld100RRef", object: "Customer", parentId: "d" },
+    { id: "r", internal: "_Reference200", object: "Customers", parentId: null }
   ];
   const result = generateSql(input(rows, { synth: true }, {
     metaById: {
@@ -134,7 +135,11 @@ function noSql(result) {
         baseTopId: "f",
         field: { internal: "_Description", object: "Description", type: "string" },
         displayPath: "Customer.Description",
-        chain: [{ refInternal: "_Fld100RRef", targetTable: "_Reference200" }]
+        chain: [{
+          refInternal: "_Fld100RRef",
+          targetTable: "_Reference200",
+          targetKind: "reference"
+        }]
       }
     }
   }));
