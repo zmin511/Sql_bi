@@ -9,7 +9,12 @@ const begin = "<!-- BEGIN GENERATED CANONICAL CORE -->";
 const end = "<!-- END GENERATED CANONICAL CORE -->";
 const hash = text => crypto.createHash("sha256").update(text).digest("hex");
 function transform(source) {
-  return source.replace(/import[\s\S]*?from\s+["'][^"']+["'];\s*/g, "")
+  const aliases = [];
+  const withoutImports = source.replace(/import\s*\{([\s\S]*?)\}\s*from\s+["'][^"']+["'];\s*/g, (_, names) => {
+    names.split(",").forEach(name => { const match = name.trim().match(/^(\w+)\s+as\s+(\w+)$/); if (match) aliases.push(`const ${match[2]} = ${match[1]};`); });
+    return "";
+  });
+  return `${aliases.join("\n")}${aliases.length ? "\n" : ""}${withoutImports}`
     .replace(/export\s+function\s+/g, "function ")
     .replace(/export\s+const\s+/g, "const ")
     .replace(/export\s*\{[^}]+\};?\s*/g, "");
