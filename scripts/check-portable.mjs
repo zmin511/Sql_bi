@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { loadProductionRuntime } from "../tests/helpers/load-production-runtime.js";
+import { verify } from "./sync-production-core.mjs";
 
 const html = fs.readFileSync("index.html", "utf8");
 
@@ -20,7 +21,10 @@ assert.doesNotMatch(
   "Portable index.html не должен загружать внешние таблицы стилей."
 );
 
-const { api, source } = loadProductionRuntime("index.html");
+const { api, source, canonicalCore } = loadProductionRuntime("index.html");
+verify(html);
+assert.equal(typeof canonicalCore?.buildQueryPlan, "function");
+assert.equal(typeof canonicalCore?.generateSql, "function");
 
 new Function(source);
 
@@ -57,4 +61,5 @@ for (const name of requiredRuntimeContracts) {
 console.log("ok 1 - portable HTML uses only embedded runtime assets");
 console.log("ok 2 - production application script has valid JavaScript syntax");
 console.log("ok 3 - test harness reaches required production runtime contracts");
-console.log("\n3 portable checks passed");
+console.log("ok 4 - generated canonical core is synchronized");
+console.log("\n4 portable checks passed");

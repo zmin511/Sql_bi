@@ -141,6 +141,7 @@ function applicationScriptFromHtml(html) {
 export function loadProductionRuntime(indexPath = "index.html") {
   const html = fs.readFileSync(indexPath, "utf8");
   let source = applicationScriptFromHtml(html);
+  const canonicalSource = (html.match(/<!-- BEGIN GENERATED CANONICAL CORE -->\s*[\s\S]*?SQLBI_CANONICAL_MANIFEST [^\n]*\n([\s\S]*?)<!-- END GENERATED CANONICAL CORE -->/) || [])[1] || "";
 
   const diagnosticApiMarker = "window.__SQLBI_TEST__ = {";
   if (!source.includes(diagnosticApiMarker)) {
@@ -163,6 +164,8 @@ export function loadProductionRuntime(indexPath = "index.html") {
 
   const { sandbox, elements } = createBrowserSandbox();
 
+  if (canonicalSource) vm.runInNewContext(canonicalSource, sandbox, { filename: indexPath, timeout: 5000 });
+
   vm.runInNewContext(source, sandbox, {
     filename: indexPath,
     timeout: 5000
@@ -176,6 +179,7 @@ export function loadProductionRuntime(indexPath = "index.html") {
     api: sandbox.__SQLBI_TEST__,
     elements,
     html,
-    source
+    source,
+    canonicalCore: sandbox.SQLBICanonicalCore || null
   };
 }
