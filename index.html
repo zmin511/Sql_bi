@@ -201,7 +201,20 @@
         <textarea id="sql" readonly>-- Загрузите структуру и отметьте поля слева</textarea>
         <div class="warn" id="sqlHint" style="display:none"></div>
         <div class="border tiny" id="diag" style="display:none; margin-top:8px; white-space:pre-wrap"></div>
-        <div class="border tiny" id="queryPlanPanel" style="margin-top:8px"><b>Связи запроса</b><div id="queryPlanStatus">Ожидание выбора полей.</div><div id="queryPlanCounts"></div><div id="queryPlanJoins"></div></div>
+        <div class="border tiny" id="queryPlanPanel" style="margin-top:8px">
+          <h3 style="margin:0 0 6px">Связи запроса</h3>
+          <div id="queryPlanStatus">Ожидание выбора полей.</div>
+          <div id="queryPlanCounts"></div>
+          <div id="queryPlanJoins"></div>
+          <h3 style="margin:10px 0 6px">Projected fields</h3>
+          <div id="queryPlanProjectedFieldsEmpty">Нет выбранных полей для SELECT.</div>
+          <div style="overflow:auto">
+            <table id="queryPlanProjectedFieldsTable" style="width:100%; border-collapse:collapse">
+              <thead><tr><th scope="col">Alias</th><th scope="col">Source</th><th scope="col">Expression</th><th scope="col">Status</th></tr></thead>
+              <tbody id="queryPlanProjectedFields"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -233,7 +246,7 @@ var o=((a=s[17])==null?void 0:a[0])?Ob(e,e[_b(s[17][0].data)][0]):[];var l=vb(s[
 var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.s.r;c<=n.e.r;++c){i=Ta(c);for(f=n.s.c;f<=n.e.c;++f){r=s[f]+i;t=l?(e[c]||[])[f]:e[r];a="";if(t===undefined)continue;else if(t.F!=null){r=t.F;if(!t.f)continue;a=t.f;if(r.indexOf(":")==-1)r=r+":"+r}if(t.f!=null)a=t.f;else if(t.t=="z")continue;else if(t.t=="n"&&t.v!=null)a=""+t.v;else if(t.t=="b")a=t.v?"TRUE":"FALSE";else if(t.w!==undefined)a="'"+t.w;else if(t.v===undefined)continue;else if(t.t=="s")a="'"+t.v;else a=""+t.v;o[o.length]=r+"="+a}}return o}function xw(e,r,t){var a=t||{};var n=+!a.skipHeader;var i=e||{};var s=0,f=0;if(i&&a.origin!=null){if(typeof a.origin=="number")s=a.origin;else{var o=typeof a.origin=="string"?Oa(a.origin):a.origin;s=o.r;f=o.c}}var l;var c={s:{c:0,r:0},e:{c:f,r:s+r.length-1+n}};if(i["!ref"]){var h=Da(i["!ref"]);c.e.c=Math.max(c.e.c,h.e.c);c.e.r=Math.max(c.e.r,h.e.r);if(s==-1){s=h.e.r+1;c.e.r=s+r.length-1+n}}else{if(s==-1){s=0;c.e.r=r.length-1+n}}var u=a.header||[],d=0;r.forEach(function(e,r){rr(e).forEach(function(t){if((d=u.indexOf(t))==-1)u[d=u.length]=t;var o=e[t];var c="z";var h="";var v=Ra({c:f+d,r:s+r+n});l=Rw(i,v);if(o&&typeof o==="object"&&!(o instanceof Date)){i[v]=o}else{if(typeof o=="number")c="n";else if(typeof o=="boolean")c="b";else if(typeof o=="string")c="s";else if(o instanceof Date){c="d";if(!a.cellDates){c="n";o=fr(o)}h=a.dateNF||X[14]}else if(o===null&&a.nullError){c="e";o=0}if(!l)i[v]=l={t:c,v:o};else{l.t=c;l.v=o;delete l.w;delete l.R;if(h)l.z=h}if(h)l.z=h}})});c.e.c=Math.max(c.e.c,f+u.length-1);var v=Ta(s);if(n)for(d=0;d<u.length;++d)i[ya(d+f)+v]={t:"s",v:u[d]};i["!ref"]=Na(c);return i}function Ow(e,r){return xw(null,e,r)}function Rw(e,r,t){if(typeof r=="string"){if(Array.isArray(e)){var a=Oa(r);if(!e[a.r])e[a.r]=[];return e[a.r][a.c]||(e[a.r][a.c]={t:"z"})}return e[r]||(e[r]={t:"z"})}if(typeof r!="number")return Rw(e,Ra(r));return Rw(e,Ra({r:r,c:t||0}))}function Iw(e,r){if(typeof r=="number"){if(r>=0&&e.SheetNames.length>r)return r;throw new Error("Cannot find sheet # "+r)}else if(typeof r=="string"){var t=e.SheetNames.indexOf(r);if(t>-1)return t;throw new Error("Cannot find sheet name |"+r+"|")}else throw new Error("Cannot find sheet |"+r+"|")}function Nw(){return{SheetNames:[],Sheets:{}}}function Dw(e,r,t,a){var n=1;if(!t)for(;n<=65535;++n,t=undefined)if(e.SheetNames.indexOf(t="Sheet"+n)==-1)break;if(!t||e.SheetNames.length>=65535)throw new Error("Too many worksheets");if(a&&e.SheetNames.indexOf(t)>=0){var i=t.match(/(^.*?)(\d+)$/);n=i&&+i[2]||0;var s=i&&i[1]||t;for(++n;n<=65535;++n)if(e.SheetNames.indexOf(t=s+n)==-1)break}Jp(t);if(e.SheetNames.indexOf(t)>=0)throw new Error("Worksheet with name |"+t+"| already exists!");e.SheetNames.push(t);e.Sheets[t]=r;return t}function Fw(e,r,t){if(!e.Workbook)e.Workbook={};if(!e.Workbook.Sheets)e.Workbook.Sheets=[];var a=Iw(e,r);if(!e.Workbook.Sheets[a])e.Workbook.Sheets[a]={};switch(t){case 0:;case 1:;case 2:break;default:throw new Error("Bad sheet visibility setting "+t);}e.Workbook.Sheets[a].Hidden=t}function Pw(e,r){e.z=r;return e}function Lw(e,r,t){if(!r){delete e.l}else{e.l={Target:r};if(t)e.l.Tooltip=t}return e}function Mw(e,r,t){return Lw(e,"#"+r,t)}function Uw(e,r,t){if(!e.c)e.c=[];e.c.push({t:r,a:t||"SheetJS"})}function Bw(e,r,t,a){var n=typeof r!="string"?r:Da(r);var i=typeof r=="string"?r:Na(r);for(var s=n.s.r;s<=n.e.r;++s)for(var f=n.s.c;f<=n.e.c;++f){var o=Rw(e,s,f);o.t="n";o.F=i;delete o.v;if(s==n.s.r&&f==n.s.c){o.f=t;if(a)o.D=true}}return e}var Ww={encode_col:ya,encode_row:Ta,encode_cell:Ra,encode_range:Na,decode_col:Ca,decode_row:ka,split_cell:xa,decode_cell:Oa,decode_range:Ia,format_cell:Pa,sheet_add_aoa:Ma,sheet_add_json:xw,sheet_add_dom:Gm,aoa_to_sheet:Ua,json_to_sheet:Ow,table_to_sheet:jm,table_to_book:Xm,sheet_to_csv:yw,sheet_to_txt:Sw,sheet_to_json:Aw,sheet_to_html:Vm,sheet_to_formulae:_w,sheet_to_row_object_array:Aw,sheet_get_cell:Rw,book_new:Nw,book_append_sheet:Dw,book_set_sheet_visibility:Fw,cell_set_number_format:Pw,cell_set_hyperlink:Lw,cell_set_internal_link:Mw,cell_add_comment:Uw,sheet_set_array_formula:Bw,consts:{SHEET_VISIBLE:0,SHEET_HIDDEN:1,SHEET_VERY_HIDDEN:2}};var Hw;function zw(e){Hw=e}function Vw(e,r){var t=Hw();var a=r==null?{}:r;if(e==null||e["!ref"]==null){t.push(null);return t}var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=n.s.r;var g=false,m=0;t._read=function(){if(!g){g=true;return t.push("\ufeff")}while(p<=n.e.r){++p;if((d[p-1]||{}).hidden)continue;c=Cw(e,n,p-1,h,s,o,i,a);if(c!=null){if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)return t.push((m++?f:"")+c)}}return t.push(null)};return t}function Gw(e,r){var t=Hw();var a=r||{};var n=a.header!=null?a.header:Bm;var i=a.footer!=null?a.footer:Wm;t.push(n);var s=Ia(e["!ref"]);a.dense=Array.isArray(e);t.push(zm(e,s,a));var f=s.s.r;var o=false;t._read=function(){if(f>s.e.r){if(!o){o=true;t.push("</table>"+i)}return t.push(null)}while(f<=s.e.r){t.push(Um(e,s,f,a));++f;break}};return t}function jw(e,r){var t=Hw({objectMode:true});if(e==null||e["!ref"]==null){t.push(null);return t}var a={t:"n",v:0},n=0,i=1,s=[],f=0,o="";var l={s:{r:0,c:0},e:{r:0,c:0}};var c=r||{};var h=c.range!=null?c.range:e["!ref"];if(c.header===1)n=1;else if(c.header==="A")n=2;else if(Array.isArray(c.header))n=3;switch(typeof h){case"string":l=Da(h);break;case"number":l=Da(e["!ref"]);l.s.r=h;break;default:l=h;}if(n>0)i=0;var u=Ta(l.s.r);var d=[];var v=0;var p=Array.isArray(e);var g=l.s.r,m=0;var b={};if(p&&!e[g])e[g]=[];var w=c.skipHidden&&e["!cols"]||[];var k=c.skipHidden&&e["!rows"]||[];for(m=l.s.c;m<=l.e.c;++m){if((w[m]||{}).hidden)continue;d[m]=ya(m);a=p?e[g][m]:e[d[m]+u];switch(n){case 1:s[m]=m-l.s.c;break;case 2:s[m]=d[m];break;case 3:s[m]=c.header[m-l.s.c];break;default:if(a==null)a={w:"__EMPTY",t:"s"};o=f=Pa(a,null,c);v=b[f]||0;if(!v)b[f]=1;else{do{o=f+"_"+v++}while(b[o]);b[f]=v;b[o]=1}s[m]=o;}}g=l.s.r+i;t._read=function(){while(g<=l.e.r){if((k[g-1]||{}).hidden)continue;var r=Tw(e,l,g,d,n,s,p,c);++g;if(r.isempty===false||(n===1?c.blankrows!==false:!!c.blankrows)){t.push(r.row);return}}return t.push(null)};return t}var Xw={to_json:jw,to_html:Gw,to_csv:Vw,set_readable:zw};if(typeof vm!=="undefined")e.parse_xlscfb=vm;e.parse_zip=Xb;e.read=iw;e.readFile=sw;e.readFileSync=sw;e.write=gw;e.writeFile=bw;e.writeFileSync=bw;e.writeFileAsync=kw;e.utils=Ww;e.writeXLSX=pw;e.writeFileXLSX=ww;e.SSF=Ve;if(typeof Xw!=="undefined")e.stream=Xw;if(typeof Ke!=="undefined")e.CFB=Ke;if(typeof require!=="undefined"){var $w=undefined;if(($w||{}).Readable)zw($w.Readable)}}if(typeof exports!=="undefined")make_xlsx_lib(exports);else if(typeof module!=="undefined"&&module.exports)make_xlsx_lib(module.exports);else if(typeof define==="function"&&define.amd)define("xlsx",function(){if(!XLSX.version)make_xlsx_lib(XLSX);return XLSX});else make_xlsx_lib(XLSX);if(typeof window!=="undefined"&&!window.XLSX)try{window.XLSX=XLSX}catch(e){}
 <!-- BEGIN GENERATED CANONICAL CORE -->
 /* Generated from canonical src/core modules. Do not edit manually. */
-/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/queryPlan.js","sha256":"16c8d7028f68f74c9d7d98e387f8d9d6edaa7ddfc385be564ce4320b4f72132a"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"99dea2aea86c9f4f25fe94f387fa0a3b30b3e529153e2898e9cb6b956eb7f25d"}],"payloadSha256":"ab089b06b2d37bb4fcaadfa1807a6999188886c952599a71dd3f3e2541642245"} */
+/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/queryPlan.js","sha256":"0935e0bb0947e7db7afab621da9c12c5093976adeb341cfdfcabc79ce0340285"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"99dea2aea86c9f4f25fe94f387fa0a3b30b3e529153e2898e9cb6b956eb7f25d"}],"payloadSha256":"7b0ebbab7f59d5486518c3360628a1e47cd00995c30a4d63600b1657279d55d7"} */
 (function(){
 // src/core/sqlIdentifiers.js
 function quoteIdentifier(value) {
@@ -2228,8 +2241,27 @@ function periodRange(input, expression) {
     ? buildManualDateRange(expression, input.dateFrom, input.dateTo)
     : buildRelativeDateRange({ pastMonths: input.periodMonths, pastDays: input.periodDays, futureMonths: input.periodMonthsFuture, futureDays: input.periodDaysFuture }, expression);
 }
-function blocked(reason, diagnostics, selectionContext = null, joins = []) {
-  return { status: "blocked", reason, selectionContext, selections: [], joins, diagnostics, sqlParts: null };
+function blocked(reason, diagnostics, selectionContext = null, joins = [], selections = []) {
+  return { status: "blocked", reason, selectionContext, selections, joins, diagnostics, sqlParts: null };
+}
+function blockedSyntheticSelection(selectionId, reason, meta = null) {
+  const field = meta && meta.field && typeof meta.field === "object" ? meta.field : null;
+  const chain = meta && Array.isArray(meta.chain) ? meta.chain.map(step => ({ ...step })) : [];
+  return {
+    id: selectionId,
+    selectionId,
+    kind: "synth",
+    sourceRowId: meta && meta.baseTopId || null,
+    sourceTable: chain.length ? chain.at(-1).targetTable || null : null,
+    sourceField: field ? String(field.internal || field.object || "") || null : null,
+    sourceAlias: null,
+    field: field ? { ...field } : null,
+    outputAlias: null,
+    expression: null,
+    status: "blocked",
+    reason,
+    chain
+  };
 }
 
 function buildQueryPlan(input = {}) {
@@ -2246,11 +2278,11 @@ function buildQueryPlan(input = {}) {
     const meta = metaById[id];
     if (!meta || typeof meta !== "object") {
       diagnostics.push(`Synthetic selection blocked for ${id}: missing_metadata / selected_meta_not_found.`);
-      return blocked("missing_metadata", diagnostics);
+      return blocked("missing_metadata", diagnostics, null, [], [blockedSyntheticSelection(id, "missing_metadata")]);
     }
     if (!meta.field || typeof meta.field !== "object") {
       diagnostics.push(`Synthetic selection blocked for ${id}: malformed_metadata / missing_field.`);
-      return blocked("malformed_metadata", diagnostics);
+      return blocked("malformed_metadata", diagnostics, null, [], [blockedSyntheticSelection(id, "malformed_metadata", meta)]);
     }
     const normalized = { ...meta, id };
     const validation = validateJoinChain(normalized.chain, { rows, maxDepth: input.refDepth });
@@ -2325,7 +2357,8 @@ function buildQueryPlan(input = {}) {
     if (!expression) { diagnostics.push("Поле пропущено: отсутствует безопасное SQL-имя колонки."); return; }
     const outputAlias = makeUniqueColumnAlias(outputAliasBase(field, meta ? meta.displayPath : ""), usedAliases);
     if (!outputAlias) { diagnostics.push("Поле пропущено: невозможно сформировать выходной alias."); return; }
-    selections.push({ id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable, sourceAlias, field: { ...field }, outputAlias, expression, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
+    const projectionSourceTable = meta && meta.chain.length ? meta.chain.at(-1).targetTable : sourceTable;
+    selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
     const bool = boolValue(id, input.boolFilters || {}); if (bool !== null && isBoolType(field.type)) wheres.push(`${expression} = ${bool}`);
   };
   original.forEach(row => addSelection(row.id, "orig", row, null, row));
@@ -4059,7 +4092,27 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     function buildQueryGraphModel(input={}){ const selected=new Set(input.selectedIds||[]),plan=input.queryPlan||null,nodes=[],edges=[],activeNodeIds=[],activeEdgeIds=[]; (input.rows||[]).forEach(row=>{const id=`row:${row.id}`,active=selected.has(row.id),kind=row.parentId&&String(row.internal||"").startsWith("_Fld")?"physical_field":String(row.internal||"").includes("_VT")?"table_part":"table";nodes.push({id,kind,rowId:row.id,syntheticId:null,table:row.internal||row.object||"",field:kind==="physical_field"?(row.internal||row.object||""):null,label:row.title||row.object||row.internal||row.id,status:active?"active":"normal",selected:active,depth:row.parentId?1:0});if(active)activeNodeIds.push(id);if(row.parentId)edges.push({id:`tree:${row.parentId}:${row.id}`,kind:"tree",sourceId:`row:${row.parentId}`,targetId:id,status:"normal",reason:null,confirmation:null,joinId:null,depth:0,label:"contains"});}); Object.entries(input.metaById||{}).forEach(([syntheticId,meta])=>{if(!selected.has(syntheticId))return;const id=`synth:${syntheticId}`;nodes.push({id,kind:"synthetic_field",rowId:null,syntheticId,table:null,field:meta.field&&meta.field.internal||null,label:meta.displayPath||syntheticId,status:"active",selected:true,depth:(meta.chain||[]).length});activeNodeIds.push(id);}); (plan&&plan.joins||[]).forEach(join=>{const edge={id:`join:${join.id}`,kind:join.kind==="header_detail"?"header_detail":"reference",sourceId:join.sourceRowId?`row:${join.sourceRowId}`:`join-source:${join.id}`,targetId:join.targetRootId?`row:${join.targetRootId}`:`join-target:${join.id}`,status:join.status||"blocked",reason:join.reason||null,confirmation:join.confirmation||null,joinId:join.id,depth:join.depth||0,label:join.sql||join.reason||"relationship"};edges.push(edge);if(join.status==="sql"||(join.syntheticIds||[]).some(id=>selected.has(id))){activeEdgeIds.push(edge.id);activeNodeIds.push(edge.sourceId,edge.targetId);}}); return {status:plan&&plan.status||"empty",reason:plan&&plan.reason||null,nodes,edges,activeNodeIds:[...new Set(activeNodeIds)],activeEdgeIds,diagnostics:plan&&plan.diagnostics||[]}; }
     function renderQueryGraph(model=buildQueryGraphModel({rows:state.rows,byId:state.byId,children:state.children,roots:state.roots,selectedIds:Object.keys(state.selected).filter(id=>state.selected[id]),metaById:state.metaById,queryPlan:state.queryPlan})){const filter=$("queryGraphFilter").value||"all",visible=model.edges.filter(edge=>filter==="all"||filter==="active"&&model.activeEdgeIds.includes(edge.id)||filter==="sql"&&edge.status==="sql"||filter==="errors"&&edge.status!=="sql"&&edge.kind!=="tree");$("queryGraphNodes").textContent=model.nodes.map(node=>`${node.status}: ${node.label}`).join("\n");$("queryGraphNodeCount").textContent=`Nodes: ${model.nodes.length}`;$("queryGraphEdgeCount").textContent=`Edges: ${visible.length}`;$("queryGraphDetails").textContent=visible.map(edge=>`${edge.kind} ${edge.status}: ${edge.label}`).join("\n");$("queryGraphEmpty").textContent=visible.length?"":"No relationships to display.";$("queryGraphSvg").innerHTML=visible.map((edge,index)=>`<line data-edge-id="${edge.id}" x1="0" y1="${12+index*12}" x2="100" y2="${12+index*12}" stroke="${edge.status==="sql"?"#2563eb":"#b45309"}"/>`).join("");return model;}
     function buildCanonicalInputFromState(){ return { rows:state.rows, byId:state.byId, selected:{...state.selected}, metaById:state.metaById, boolFilters:state.boolFilters, refDepth:state.refDepth, schema:state.schema, dbName:state.dbName, fromTable:state.fromTable, periodFieldId:state.periodFieldId, periodMode:state.periodMode, periodMonths:state.periodMonths, periodDays:state.periodDays, periodMonthsFuture:state.periodMonthsFuture, periodDaysFuture:state.periodDaysFuture, dateFrom:state.dateFrom, dateTo:state.dateTo }; }
-    function renderQueryPlanPanel(plan){ const status=$("queryPlanStatus"),counts=$("queryPlanCounts"),joins=$("queryPlanJoins"); if(!plan){status.textContent="Ожидание выбора полей.";counts.textContent=joins.textContent="";return;} status.textContent=plan.status==="ready"?(plan.sqlParts&&plan.sqlParts.empty?"Пустой выбор.":"Готово."):`Заблокировано: ${plan.reason}`; counts.textContent=`Поля: ${(plan.selections||[]).length}; связи: ${(plan.joins||[]).length}.`; joins.textContent=(plan.joins||[]).map(join=>join.status==="sql"?join.sql:`${join.status||"blocked"}: ${join.reason||""}`).join("\n"); }
+    function renderQueryPlanPanel(plan){
+      const status=$("queryPlanStatus"),counts=$("queryPlanCounts"),joins=$("queryPlanJoins"),projected=$("queryPlanProjectedFields"),empty=$("queryPlanProjectedFieldsEmpty");
+      projected.replaceChildren();
+      if(!plan){status.textContent="Ожидание выбора полей.";counts.textContent=joins.textContent="";empty.textContent="Нет выбранных полей для SELECT.";return;}
+      status.textContent=plan.status==="ready"?(plan.sqlParts&&plan.sqlParts.empty?"Пустой выбор.":"Готово."):`Заблокировано: ${plan.reason}`;
+      counts.textContent=`Поля: ${(plan.selections||[]).length}; связи: ${(plan.joins||[]).length}.`;
+      joins.textContent=(plan.joins||[]).map(join=>join.status==="sql"?join.sql:`${join.status||"blocked"}: ${join.reason||""}`).join("\n");
+      for(const projection of plan.selections||[]){
+        const row=document.createElement("tr");
+        row.dataset.selectionId=projection.selectionId;
+        const values=[
+          projection.outputAlias||"—",
+          projection.sourceTable&&projection.sourceField?`${projection.sourceTable}.${projection.sourceField}`:"—",
+          projection.expression||"—",
+          projection.reason?`${projection.status}: ${projection.reason}`:projection.status
+        ];
+        for(const value of values){const cell=document.createElement("td");cell.textContent=value||"—";cell.style.verticalAlign="top";cell.style.padding="3px 6px";cell.style.whiteSpace="pre-wrap";row.appendChild(cell);}
+        projected.appendChild(row);
+      }
+      empty.textContent=(plan.selections||[]).length?"":plan.status==="blocked"?`Projected fields недоступны: ${plan.reason}.`:"Нет выбранных полей для SELECT.";
+    }
     function renderCanonicalSQL(){ const out=$("sql"),hint=$("sqlHint"),core=window.SQLBICanonicalCore; if(!core||typeof core.generateSql!=="function") throw new Error("Embedded canonical core is unavailable."); const result=core.generateSql(buildCanonicalInputFromState()); state.queryResult=result;state.queryPlan=result.plan;$("selCount").textContent=Object.keys(state.selected).filter(id=>state.selected[id]).length; out.value=result.plan&&result.plan.sqlParts&&result.plan.sqlParts.empty?"-- Выберите хотя бы одно доступное SQL-поле слева":(result.sql||"-- SQL ЗАБЛОКИРОВАН"); hint.textContent=result.hint||"";hint.style.display=result.hint?"block":"none";renderDiagnostics(result.diagnostics||[]);renderQueryPlanPanel(result.plan);queueMicrotask(syncExportButtons);return result; }
     function renderSQL(){
       const result = renderCanonicalSQL();

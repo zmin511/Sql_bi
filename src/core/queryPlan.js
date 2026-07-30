@@ -24,8 +24,27 @@ function periodRange(input, expression) {
     ? buildManualDateRange(expression, input.dateFrom, input.dateTo)
     : buildRelativeDateRange({ pastMonths: input.periodMonths, pastDays: input.periodDays, futureMonths: input.periodMonthsFuture, futureDays: input.periodDaysFuture }, expression);
 }
-function blocked(reason, diagnostics, selectionContext = null, joins = []) {
-  return { status: "blocked", reason, selectionContext, selections: [], joins, diagnostics, sqlParts: null };
+function blocked(reason, diagnostics, selectionContext = null, joins = [], selections = []) {
+  return { status: "blocked", reason, selectionContext, selections, joins, diagnostics, sqlParts: null };
+}
+function blockedSyntheticSelection(selectionId, reason, meta = null) {
+  const field = meta && meta.field && typeof meta.field === "object" ? meta.field : null;
+  const chain = meta && Array.isArray(meta.chain) ? meta.chain.map(step => ({ ...step })) : [];
+  return {
+    id: selectionId,
+    selectionId,
+    kind: "synth",
+    sourceRowId: meta && meta.baseTopId || null,
+    sourceTable: chain.length ? chain.at(-1).targetTable || null : null,
+    sourceField: field ? String(field.internal || field.object || "") || null : null,
+    sourceAlias: null,
+    field: field ? { ...field } : null,
+    outputAlias: null,
+    expression: null,
+    status: "blocked",
+    reason,
+    chain
+  };
 }
 
 export function buildQueryPlan(input = {}) {
@@ -42,11 +61,11 @@ export function buildQueryPlan(input = {}) {
     const meta = metaById[id];
     if (!meta || typeof meta !== "object") {
       diagnostics.push(`Synthetic selection blocked for ${id}: missing_metadata / selected_meta_not_found.`);
-      return blocked("missing_metadata", diagnostics);
+      return blocked("missing_metadata", diagnostics, null, [], [blockedSyntheticSelection(id, "missing_metadata")]);
     }
     if (!meta.field || typeof meta.field !== "object") {
       diagnostics.push(`Synthetic selection blocked for ${id}: malformed_metadata / missing_field.`);
-      return blocked("malformed_metadata", diagnostics);
+      return blocked("malformed_metadata", diagnostics, null, [], [blockedSyntheticSelection(id, "malformed_metadata", meta)]);
     }
     const normalized = { ...meta, id };
     const validation = validateJoinChain(normalized.chain, { rows, maxDepth: input.refDepth });
@@ -121,7 +140,8 @@ export function buildQueryPlan(input = {}) {
     if (!expression) { diagnostics.push("Поле пропущено: отсутствует безопасное SQL-имя колонки."); return; }
     const outputAlias = makeUniqueColumnAlias(outputAliasBase(field, meta ? meta.displayPath : ""), usedAliases);
     if (!outputAlias) { diagnostics.push("Поле пропущено: невозможно сформировать выходной alias."); return; }
-    selections.push({ id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable, sourceAlias, field: { ...field }, outputAlias, expression, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
+    const projectionSourceTable = meta && meta.chain.length ? meta.chain.at(-1).targetTable : sourceTable;
+    selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
     const bool = boolValue(id, input.boolFilters || {}); if (bool !== null && isBoolType(field.type)) wheres.push(`${expression} = ${bool}`);
   };
   original.forEach(row => addSelection(row.id, "orig", row, null, row));
