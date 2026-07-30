@@ -233,7 +233,7 @@ var o=((a=s[17])==null?void 0:a[0])?Ob(e,e[_b(s[17][0].data)][0]):[];var l=vb(s[
 var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.s.r;c<=n.e.r;++c){i=Ta(c);for(f=n.s.c;f<=n.e.c;++f){r=s[f]+i;t=l?(e[c]||[])[f]:e[r];a="";if(t===undefined)continue;else if(t.F!=null){r=t.F;if(!t.f)continue;a=t.f;if(r.indexOf(":")==-1)r=r+":"+r}if(t.f!=null)a=t.f;else if(t.t=="z")continue;else if(t.t=="n"&&t.v!=null)a=""+t.v;else if(t.t=="b")a=t.v?"TRUE":"FALSE";else if(t.w!==undefined)a="'"+t.w;else if(t.v===undefined)continue;else if(t.t=="s")a="'"+t.v;else a=""+t.v;o[o.length]=r+"="+a}}return o}function xw(e,r,t){var a=t||{};var n=+!a.skipHeader;var i=e||{};var s=0,f=0;if(i&&a.origin!=null){if(typeof a.origin=="number")s=a.origin;else{var o=typeof a.origin=="string"?Oa(a.origin):a.origin;s=o.r;f=o.c}}var l;var c={s:{c:0,r:0},e:{c:f,r:s+r.length-1+n}};if(i["!ref"]){var h=Da(i["!ref"]);c.e.c=Math.max(c.e.c,h.e.c);c.e.r=Math.max(c.e.r,h.e.r);if(s==-1){s=h.e.r+1;c.e.r=s+r.length-1+n}}else{if(s==-1){s=0;c.e.r=r.length-1+n}}var u=a.header||[],d=0;r.forEach(function(e,r){rr(e).forEach(function(t){if((d=u.indexOf(t))==-1)u[d=u.length]=t;var o=e[t];var c="z";var h="";var v=Ra({c:f+d,r:s+r+n});l=Rw(i,v);if(o&&typeof o==="object"&&!(o instanceof Date)){i[v]=o}else{if(typeof o=="number")c="n";else if(typeof o=="boolean")c="b";else if(typeof o=="string")c="s";else if(o instanceof Date){c="d";if(!a.cellDates){c="n";o=fr(o)}h=a.dateNF||X[14]}else if(o===null&&a.nullError){c="e";o=0}if(!l)i[v]=l={t:c,v:o};else{l.t=c;l.v=o;delete l.w;delete l.R;if(h)l.z=h}if(h)l.z=h}})});c.e.c=Math.max(c.e.c,f+u.length-1);var v=Ta(s);if(n)for(d=0;d<u.length;++d)i[ya(d+f)+v]={t:"s",v:u[d]};i["!ref"]=Na(c);return i}function Ow(e,r){return xw(null,e,r)}function Rw(e,r,t){if(typeof r=="string"){if(Array.isArray(e)){var a=Oa(r);if(!e[a.r])e[a.r]=[];return e[a.r][a.c]||(e[a.r][a.c]={t:"z"})}return e[r]||(e[r]={t:"z"})}if(typeof r!="number")return Rw(e,Ra(r));return Rw(e,Ra({r:r,c:t||0}))}function Iw(e,r){if(typeof r=="number"){if(r>=0&&e.SheetNames.length>r)return r;throw new Error("Cannot find sheet # "+r)}else if(typeof r=="string"){var t=e.SheetNames.indexOf(r);if(t>-1)return t;throw new Error("Cannot find sheet name |"+r+"|")}else throw new Error("Cannot find sheet |"+r+"|")}function Nw(){return{SheetNames:[],Sheets:{}}}function Dw(e,r,t,a){var n=1;if(!t)for(;n<=65535;++n,t=undefined)if(e.SheetNames.indexOf(t="Sheet"+n)==-1)break;if(!t||e.SheetNames.length>=65535)throw new Error("Too many worksheets");if(a&&e.SheetNames.indexOf(t)>=0){var i=t.match(/(^.*?)(\d+)$/);n=i&&+i[2]||0;var s=i&&i[1]||t;for(++n;n<=65535;++n)if(e.SheetNames.indexOf(t=s+n)==-1)break}Jp(t);if(e.SheetNames.indexOf(t)>=0)throw new Error("Worksheet with name |"+t+"| already exists!");e.SheetNames.push(t);e.Sheets[t]=r;return t}function Fw(e,r,t){if(!e.Workbook)e.Workbook={};if(!e.Workbook.Sheets)e.Workbook.Sheets=[];var a=Iw(e,r);if(!e.Workbook.Sheets[a])e.Workbook.Sheets[a]={};switch(t){case 0:;case 1:;case 2:break;default:throw new Error("Bad sheet visibility setting "+t);}e.Workbook.Sheets[a].Hidden=t}function Pw(e,r){e.z=r;return e}function Lw(e,r,t){if(!r){delete e.l}else{e.l={Target:r};if(t)e.l.Tooltip=t}return e}function Mw(e,r,t){return Lw(e,"#"+r,t)}function Uw(e,r,t){if(!e.c)e.c=[];e.c.push({t:r,a:t||"SheetJS"})}function Bw(e,r,t,a){var n=typeof r!="string"?r:Da(r);var i=typeof r=="string"?r:Na(r);for(var s=n.s.r;s<=n.e.r;++s)for(var f=n.s.c;f<=n.e.c;++f){var o=Rw(e,s,f);o.t="n";o.F=i;delete o.v;if(s==n.s.r&&f==n.s.c){o.f=t;if(a)o.D=true}}return e}var Ww={encode_col:ya,encode_row:Ta,encode_cell:Ra,encode_range:Na,decode_col:Ca,decode_row:ka,split_cell:xa,decode_cell:Oa,decode_range:Ia,format_cell:Pa,sheet_add_aoa:Ma,sheet_add_json:xw,sheet_add_dom:Gm,aoa_to_sheet:Ua,json_to_sheet:Ow,table_to_sheet:jm,table_to_book:Xm,sheet_to_csv:yw,sheet_to_txt:Sw,sheet_to_json:Aw,sheet_to_html:Vm,sheet_to_formulae:_w,sheet_to_row_object_array:Aw,sheet_get_cell:Rw,book_new:Nw,book_append_sheet:Dw,book_set_sheet_visibility:Fw,cell_set_number_format:Pw,cell_set_hyperlink:Lw,cell_set_internal_link:Mw,cell_add_comment:Uw,sheet_set_array_formula:Bw,consts:{SHEET_VISIBLE:0,SHEET_HIDDEN:1,SHEET_VERY_HIDDEN:2}};var Hw;function zw(e){Hw=e}function Vw(e,r){var t=Hw();var a=r==null?{}:r;if(e==null||e["!ref"]==null){t.push(null);return t}var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=n.s.r;var g=false,m=0;t._read=function(){if(!g){g=true;return t.push("\ufeff")}while(p<=n.e.r){++p;if((d[p-1]||{}).hidden)continue;c=Cw(e,n,p-1,h,s,o,i,a);if(c!=null){if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)return t.push((m++?f:"")+c)}}return t.push(null)};return t}function Gw(e,r){var t=Hw();var a=r||{};var n=a.header!=null?a.header:Bm;var i=a.footer!=null?a.footer:Wm;t.push(n);var s=Ia(e["!ref"]);a.dense=Array.isArray(e);t.push(zm(e,s,a));var f=s.s.r;var o=false;t._read=function(){if(f>s.e.r){if(!o){o=true;t.push("</table>"+i)}return t.push(null)}while(f<=s.e.r){t.push(Um(e,s,f,a));++f;break}};return t}function jw(e,r){var t=Hw({objectMode:true});if(e==null||e["!ref"]==null){t.push(null);return t}var a={t:"n",v:0},n=0,i=1,s=[],f=0,o="";var l={s:{r:0,c:0},e:{r:0,c:0}};var c=r||{};var h=c.range!=null?c.range:e["!ref"];if(c.header===1)n=1;else if(c.header==="A")n=2;else if(Array.isArray(c.header))n=3;switch(typeof h){case"string":l=Da(h);break;case"number":l=Da(e["!ref"]);l.s.r=h;break;default:l=h;}if(n>0)i=0;var u=Ta(l.s.r);var d=[];var v=0;var p=Array.isArray(e);var g=l.s.r,m=0;var b={};if(p&&!e[g])e[g]=[];var w=c.skipHidden&&e["!cols"]||[];var k=c.skipHidden&&e["!rows"]||[];for(m=l.s.c;m<=l.e.c;++m){if((w[m]||{}).hidden)continue;d[m]=ya(m);a=p?e[g][m]:e[d[m]+u];switch(n){case 1:s[m]=m-l.s.c;break;case 2:s[m]=d[m];break;case 3:s[m]=c.header[m-l.s.c];break;default:if(a==null)a={w:"__EMPTY",t:"s"};o=f=Pa(a,null,c);v=b[f]||0;if(!v)b[f]=1;else{do{o=f+"_"+v++}while(b[o]);b[f]=v;b[o]=1}s[m]=o;}}g=l.s.r+i;t._read=function(){while(g<=l.e.r){if((k[g-1]||{}).hidden)continue;var r=Tw(e,l,g,d,n,s,p,c);++g;if(r.isempty===false||(n===1?c.blankrows!==false:!!c.blankrows)){t.push(r.row);return}}return t.push(null)};return t}var Xw={to_json:jw,to_html:Gw,to_csv:Vw,set_readable:zw};if(typeof vm!=="undefined")e.parse_xlscfb=vm;e.parse_zip=Xb;e.read=iw;e.readFile=sw;e.readFileSync=sw;e.write=gw;e.writeFile=bw;e.writeFileSync=bw;e.writeFileAsync=kw;e.utils=Ww;e.writeXLSX=pw;e.writeFileXLSX=ww;e.SSF=Ve;if(typeof Xw!=="undefined")e.stream=Xw;if(typeof Ke!=="undefined")e.CFB=Ke;if(typeof require!=="undefined"){var $w=undefined;if(($w||{}).Readable)zw($w.Readable)}}if(typeof exports!=="undefined")make_xlsx_lib(exports);else if(typeof module!=="undefined"&&module.exports)make_xlsx_lib(module.exports);else if(typeof define==="function"&&define.amd)define("xlsx",function(){if(!XLSX.version)make_xlsx_lib(XLSX);return XLSX});else make_xlsx_lib(XLSX);if(typeof window!=="undefined"&&!window.XLSX)try{window.XLSX=XLSX}catch(e){}
 <!-- BEGIN GENERATED CANONICAL CORE -->
 /* Generated from canonical src/core modules. Do not edit manually. */
-/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/queryPlan.js","sha256":"16c8d7028f68f74c9d7d98e387f8d9d6edaa7ddfc385be564ce4320b4f72132a"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"43780d988b99d5144a35c9247fe50af93ead60d65901ed83c78d9a8605ef889e"}],"payloadSha256":"f35d0d78320c6c0074c6248df98d4918a0a0f7fc820ec9b8d759830d9e8acf5f"} */
+/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/queryPlan.js","sha256":"16c8d7028f68f74c9d7d98e387f8d9d6edaa7ddfc385be564ce4320b4f72132a"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"99dea2aea86c9f4f25fe94f387fa0a3b30b3e529153e2898e9cb6b956eb7f25d"}],"payloadSha256":"ab089b06b2d37bb4fcaadfa1807a6999188886c952599a71dd3f3e2541642245"} */
 (function(){
 // src/core/sqlIdentifiers.js
 function quoteIdentifier(value) {
@@ -2519,11 +2519,21 @@ function parseProjectSnapshot(input) {
   const query = plainObject(project.query);
   const view = plainObject(project.view);
   const periodFieldId = stringValue(query.periodFieldId);
+  const normalizedBoolFilters = boolFilterMap(selection.boolFilters);
+  const droppedSelectedIds = Object.keys(rawSelected).filter(id => !own(selected, id)).sort();
+  const droppedBoolFilterIds = Object.keys(normalizedBoolFilters).filter(id => !ids.has(id)).sort();
+  const droppedPeriodFieldId = periodFieldId && !ids.has(periodFieldId) ? periodFieldId : "";
+  const loadDiagnostics = {
+    droppedSelectedIds,
+    droppedBoolFilterIds,
+    droppedPeriodFieldId,
+    recovered: Boolean(droppedSelectedIds.length || droppedBoolFilterIds.length || droppedPeriodFieldId)
+  };
   return {
     rows: normalizedRows,
     selected,
     metaById: safeSynthetic,
-    boolFilters: Object.fromEntries(Object.entries(boolFilterMap(selection.boolFilters)).filter(([id]) => ids.has(id))),
+    boolFilters: Object.fromEntries(Object.entries(normalizedBoolFilters).filter(([id]) => ids.has(id))),
     flatten: booleanMap(selection.flatten),
     expanded: Object.fromEntries(Object.entries(booleanMap(view.expanded)).filter(([id]) => ids.has(id) || own(safeSynthetic, id))),
     search: stringValue(view.search),
@@ -2541,7 +2551,8 @@ function parseProjectSnapshot(input) {
     periodDaysFuture: finiteInteger(query.periodDaysFuture, 0, 0, 36600),
     refDepth: finiteInteger(query.refDepth, 5, 1, 5),
     relationMode: query.relationMode === "warn" ? "warn" : "detail"
-    ,queryGraph: normalizeVisualizationSettings(view.visualization)
+    ,queryGraph: normalizeVisualizationSettings(view.visualization),
+    loadDiagnostics
   };
 }
 
@@ -2665,9 +2676,14 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       });
       const query=projectPlainObject(project.query), view=projectPlainObject(project.view);
       const periodFieldId=projectString(query.periodFieldId);
+      const normalizedBoolFilters=projectBoolFilters(selection.boolFilters);
+      const droppedSelectedIds=Object.keys(rawSelected).filter(id=>!Object.prototype.hasOwnProperty.call(selected,id)).sort();
+      const droppedBoolFilterIds=Object.keys(normalizedBoolFilters).filter(id=>!ids.has(id)).sort();
+      const droppedPeriodFieldId=periodFieldId&&!ids.has(periodFieldId)?periodFieldId:"";
+      const loadDiagnostics={droppedSelectedIds,droppedBoolFilterIds,droppedPeriodFieldId,recovered:Boolean(droppedSelectedIds.length||droppedBoolFilterIds.length||droppedPeriodFieldId)};
       return {
         rows:normalizedRows, selected, metaById,
-        boolFilters:Object.fromEntries(Object.entries(projectBoolFilters(selection.boolFilters)).filter(([id])=>ids.has(id))),
+        boolFilters:Object.fromEntries(Object.entries(normalizedBoolFilters).filter(([id])=>ids.has(id))),
         flatten:projectBooleanMap(selection.flatten),
         expanded:Object.fromEntries(Object.entries(projectBooleanMap(view.expanded)).filter(([id])=>ids.has(id) || metaById[id])),
         search:projectString(view.search), serverName:projectString(query.serverName), dbName:projectString(query.dbName), schema:projectString(query.schema,"dbo"),
@@ -2675,7 +2691,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
         periodMode:query.periodMode==="manual"?"manual":"relative", dateFrom:projectDate(query.dateFrom), dateTo:projectDate(query.dateTo),
         periodMonths:projectInteger(query.periodMonths,3,0,1200), periodDays:projectInteger(query.periodDays,0,0,36600),
         periodMonthsFuture:projectInteger(query.periodMonthsFuture,0,0,1200), periodDaysFuture:projectInteger(query.periodDaysFuture,0,0,36600),
-        refDepth:projectInteger(query.refDepth,5,1,5), relationMode:query.relationMode==="warn"?"warn":"detail", queryGraph:normalizeVisualizationSettings(view.visualization)
+        refDepth:projectInteger(query.refDepth,5,1,5), relationMode:query.relationMode==="warn"?"warn":"detail", queryGraph:normalizeVisualizationSettings(view.visualization), loadDiagnostics
       };
     }
 
@@ -4273,8 +4289,15 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       const file=e.target.files && e.target.files[0];
       if(!file) return;
       try{
-        applyProjectSnapshot(await file.text());
-        alert(`Проект загружен: ${file.name}`);
+        const restored=applyProjectSnapshot(await file.text());
+        const recovery=restored.loadDiagnostics;
+        if(recovery&&recovery.recovered){
+          const parts=[];
+          if(recovery.droppedSelectedIds.length) parts.push(`удалены отсутствующие выбранные поля: ${recovery.droppedSelectedIds.join(", ")}`);
+          if(recovery.droppedBoolFilterIds.length) parts.push(`удалены фильтры отсутствующих полей: ${recovery.droppedBoolFilterIds.join(", ")}`);
+          if(recovery.droppedPeriodFieldId) parts.push(`сброшено отсутствующее поле периода: ${recovery.droppedPeriodFieldId}`);
+          alert(`Проект загружен с безопасным восстановлением: ${file.name}\n${parts.join("\n")}`);
+        } else alert(`Проект загружен: ${file.name}`);
       } catch(err){
         alert("Не удалось загрузить проект: " + (err && err.message ? err.message : err));
       } finally {

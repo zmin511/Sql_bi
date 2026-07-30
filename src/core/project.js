@@ -143,11 +143,21 @@ export function parseProjectSnapshot(input) {
   const query = plainObject(project.query);
   const view = plainObject(project.view);
   const periodFieldId = stringValue(query.periodFieldId);
+  const normalizedBoolFilters = boolFilterMap(selection.boolFilters);
+  const droppedSelectedIds = Object.keys(rawSelected).filter(id => !own(selected, id)).sort();
+  const droppedBoolFilterIds = Object.keys(normalizedBoolFilters).filter(id => !ids.has(id)).sort();
+  const droppedPeriodFieldId = periodFieldId && !ids.has(periodFieldId) ? periodFieldId : "";
+  const loadDiagnostics = {
+    droppedSelectedIds,
+    droppedBoolFilterIds,
+    droppedPeriodFieldId,
+    recovered: Boolean(droppedSelectedIds.length || droppedBoolFilterIds.length || droppedPeriodFieldId)
+  };
   return {
     rows: normalizedRows,
     selected,
     metaById: safeSynthetic,
-    boolFilters: Object.fromEntries(Object.entries(boolFilterMap(selection.boolFilters)).filter(([id]) => ids.has(id))),
+    boolFilters: Object.fromEntries(Object.entries(normalizedBoolFilters).filter(([id]) => ids.has(id))),
     flatten: booleanMap(selection.flatten),
     expanded: Object.fromEntries(Object.entries(booleanMap(view.expanded)).filter(([id]) => ids.has(id) || own(safeSynthetic, id))),
     search: stringValue(view.search),
@@ -165,6 +175,7 @@ export function parseProjectSnapshot(input) {
     periodDaysFuture: finiteInteger(query.periodDaysFuture, 0, 0, 36600),
     refDepth: finiteInteger(query.refDepth, 5, 1, 5),
     relationMode: query.relationMode === "warn" ? "warn" : "detail"
-    ,queryGraph: normalizeVisualizationSettings(view.visualization)
+    ,queryGraph: normalizeVisualizationSettings(view.visualization),
+    loadDiagnostics
   };
 }
