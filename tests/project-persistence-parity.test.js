@@ -64,7 +64,7 @@ test("synthetic boolean filters survive canonical production delegation", () => 
   const synthetic = structuredClone(snapshot);
   synthetic.selection = {
     selected: { syntheticFlag: true },
-    synthetic: { syntheticFlag: { field: { internal: "_FldSynthetic", type: "bool" }, chain: [] } },
+    synthetic: { syntheticFlag: { baseTopId: "doc", field: { internal: "_FldSynthetic", type: "bool" }, chain: [] } },
     boolFilters: { syntheticFlag: { yes: true } }
   };
   const restored = value.api.applyProjectSnapshot(synthetic);

@@ -44,6 +44,26 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function nonEmptyString(value) {
+  return typeof value === "string" && value.length > 0;
+}
+
+function validSyntheticMetadata(value, physicalIds) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!Array.isArray(value.chain)) return false;
+  if (!value.field || typeof value.field !== "object" || Array.isArray(value.field) || !nonEmptyString(value.field.internal)) return false;
+  if (value.chain.length && !nonEmptyString(value.baseTopId)) return false;
+  if (nonEmptyString(value.baseTopId) && !physicalIds.has(value.baseTopId)) return false;
+  return value.chain.every(step => (
+    step
+    && typeof step === "object"
+    && !Array.isArray(step)
+    && nonEmptyString(step.refInternal)
+    && nonEmptyString(step.targetTable)
+    && ["reference", "enum"].includes(step.targetKind)
+  ));
+}
+
 export function normalizeVisualizationSettings(value) {
   const source = plainObject(value);
   return {
@@ -117,16 +137,19 @@ export function parseProjectSnapshot(input) {
 
   const rows = project.structure?.rows;
   if (!Array.isArray(rows) || !rows.length) throw new Error("В проекте отсутствует структура MXL/XLSX.");
+  const rowIds = new Set();
   const normalizedRows = rows.map((row, index) => {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
       throw new Error(`Некорректная строка структуры проекта: ${index + 1}.`);
     }
     const id = stringValue(row.id);
     if (!id) throw new Error(`В строке структуры ${index + 1} отсутствует ID.`);
+    if (rowIds.has(id)) throw new Error(`Проект содержит повторяющийся идентификатор строки: ${id}`);
+    rowIds.add(id);
     return cloneJson(row);
   });
 
-  const ids = new Set(normalizedRows.map(row => String(row.id)));
+  const ids = rowIds;
   const selection = plainObject(project.selection);
   const rawSelected = booleanMap(selection.selected);
   const synthetic = plainObject(selection.synthetic);
@@ -134,7 +157,7 @@ export function parseProjectSnapshot(input) {
   const safeSynthetic = {};
   for (const id of Object.keys(rawSelected)) {
     if (ids.has(id)) selected[id] = true;
-    else if (synthetic[id] && typeof synthetic[id] === "object" && !Array.isArray(synthetic[id])) {
+    else if (validSyntheticMetadata(synthetic[id], ids)) {
       selected[id] = true;
       safeSynthetic[id] = cloneJson(synthetic[id]);
     }
