@@ -37,10 +37,14 @@ export function withCandidate(root, callback) {
   const unstaged = execFileSync("git", ["diff", "--name-only"], { cwd: root, encoding: "utf8" }).trim();
   if (unstaged) fail("staged candidate has unstaged tracked changes");
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "sql-bi-preflight-"));
+  const archive = path.join(os.tmpdir(), `sql-bi-preflight-${process.pid}-${Date.now()}.tar`);
   try {
-    run("git", ["-c", "core.autocrlf=false", "checkout-index", "--all", `--prefix=${temp}${path.sep}`], root);
+    const treeId = execFileSync("git", ["write-tree"], { cwd: root, encoding: "utf8" }).trim();
+    const bytes = execFileSync("git", ["archive", "--format=tar", treeId], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
+    fs.writeFileSync(archive, bytes);
+    run("tar", ["-xf", archive, "-C", temp], root);
     return callback(temp, { staged: true, files: staged });
-  } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+  } finally { fs.rmSync(archive, { force: true }); fs.rmSync(temp, { recursive: true, force: true }); }
 }
 export function checkCore(root, { release = false } = {}) {
   run(process.execPath, ["scripts/sync-production-core.mjs", "--check"], root);

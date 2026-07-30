@@ -7,7 +7,10 @@ const htmlPath = path.join(root, "index.html");
 const modules = ["sqlIdentifiers.js", "types.js", "tableDetect.js", "relationships.js", "references.js", "selectionContext.js", "casts.js", "dates.js", "queryPlan.js", "sqlGenerate.js", "project.js"].map(name => `src/core/${name}`);
 const begin = "<!-- BEGIN GENERATED CANONICAL CORE -->";
 const end = "<!-- END GENERATED CANONICAL CORE -->";
-const hash = text => crypto.createHash("sha256").update(text).digest("hex");
+export function normalizeSourceText(text) {
+  return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+}
+const hash = text => crypto.createHash("sha256").update(normalizeSourceText(text), "utf8").digest("hex");
 function transform(source) {
   const aliases = [];
   const withoutImports = source.replace(/import\s*\{([\s\S]*?)\}\s*from\s+["'][^"']+["'];\s*/g, (_, names) => {
@@ -20,7 +23,7 @@ function transform(source) {
     .replace(/export\s*\{[^}]+\};?\s*/g, "");
 }
 export function buildEmbeddedBlock() {
-  const sources = modules.map(file => ({ file, source: fs.readFileSync(path.join(root, file), "utf8") }));
+  const sources = modules.map(file => ({ file, source: normalizeSourceText(fs.readFileSync(path.join(root, file), "utf8")) }));
   const manifest = { format: 1, modules: sources.map(item => ({ file: item.file, sha256: hash(item.source) })) };
   const payload = `(function(){\n${sources.map(item => `// ${item.file}\n${transform(item.source)}`).join("\n")}\nwindow.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizationSettings };\n})();\n`;
   manifest.payloadSha256 = hash(payload);
@@ -32,7 +35,7 @@ export function verify(html) {
   const start = html.indexOf(begin), finish = html.indexOf(end);
   if (start >= finish) throw new Error("generated marker order is invalid");
   if (html.slice(start, finish).includes("import ")) throw new Error("embedded runtime contains import");
-  if (html.slice(start, finish + end.length).trim() !== buildEmbeddedBlock().trim()) throw new Error("generated runtime is stale or manually modified");
+  if (normalizeSourceText(html.slice(start, finish + end.length)).trim() !== buildEmbeddedBlock().trim()) throw new Error("generated runtime is stale or manually modified");
   return true;
 }
 const mode = process.argv[2];
