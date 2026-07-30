@@ -1,4 +1,22 @@
 # Changelog
+## 0.2.2 - 2026-07-30
+
+### Added and changed
+- Canonical SQL generation now uses one canonical query plan for selections, aliases and JOINs.
+- Reference validation, deterministic joins, shared-prefix deduplication, header/detail handling and blocked relationships are covered by the canonical flow.
+- The portable single-file build has deterministic source and embedded-payload SHA-256 checks with stale-block detection.
+- Query relationship visualization supports tree, graph and split modes with all, active, SQL and error filters.
+- Project persistence stores view.visualization and remains backward compatible with older project files.
+
+### Release remediation
+- Removed the public mutable production test API; test hooks are VM-only.
+- Removed the duplicate visualization normalizer and the unreachable legacy SQL/JOIN renderer.
+- Replaced formal test-count assertions with meaningful production scenarios.
+
+### Verification
+- Scenario suites: query plan 40; production core embed 30; production UI characterization 40; production query-plan parity 20; production query graph 10; production project visualization 10; reference resolution parity 15; reference chain parity 17; reference SQL integration 28; selection context integration 13; table-part header parity 17.
+- Portable checks: 5. Full npm test passed.
+
 
 ## 0.2.1 — 2026-07-22
 

@@ -166,7 +166,7 @@ DATEADD(YEAR, -2000, T.[_Date_Time])
 
 Если выбранные связи могут размножить строки, приложение должно показывать предупреждение в диагностике. Агрегация через `STRING_AGG` планируется как отдельный явный режим, но не должна включаться автоматически.
 
-## Ограничения версии 0.2.1
+## Ограничения версии 0.2.2
 
 - Проект остается single-file HTML/JS для автономного запуска.
 - Генерируется SQL Server SQL для структуры базы 1С.
@@ -179,7 +179,7 @@ DATEADD(YEAR, -2000, T.[_Date_Time])
 
 ## Версионирование и откат
 
-Текущая версия разработки: `0.2.1`. Последний опубликованный стабильный релиз: `0.2.0`.
+Текущая версия разработки: `0.2.2`. Последний опубликованный стабильный релиз: `0.2.0`.
 
 Правила версий:
 
@@ -267,7 +267,7 @@ No installation is required. The application is a single HTML file.
 
 ## Current Version
 
-Development version: `0.2.1`. Latest stable release: `0.2.0`.
+Development version: `0.2.2`. Latest stable release: `0.2.0`.
 
 The release is a self-contained portable HTML file: SheetJS is embedded, and no internet connection is required.
 
