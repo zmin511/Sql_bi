@@ -38,7 +38,7 @@ export function withCandidate(root, callback) {
   if (unstaged) fail("staged candidate has unstaged tracked changes");
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "sql-bi-preflight-"));
   try {
-    run("git", ["checkout-index", "--all", `--prefix=${temp}${path.sep}`], root);
+    run("git", ["-c", "core.autocrlf=false", "checkout-index", "--all", `--prefix=${temp}${path.sep}`], root);
     return callback(temp, { staged: true, files: staged });
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 }
