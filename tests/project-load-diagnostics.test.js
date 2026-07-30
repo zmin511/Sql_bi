@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseProjectSnapshot } from "../src/core/project.js";
+import { createProjectSnapshot, parseProjectSnapshot } from "../src/core/project.js";
 import { loadProductionRuntime } from "./helpers/load-production-runtime.js";
 
 const project = {
@@ -54,6 +54,57 @@ assert.deepEqual(clean.loadDiagnostics, {
 const repeated = parseProjectSnapshot(JSON.stringify(project));
 assert.deepEqual(repeated.loadDiagnostics, canonical.loadDiagnostics);
 assert.deepEqual(project.selection.selected, { existing: true, missing: true });
+
+const syntheticBooleanState = {
+  rows: [
+    { id: "doc", object: "Документ", internal: "_Document1", parentId: null },
+    { id: "owner", object: "Владелец", internal: "_Fld2RRef", type: "Reference.Owners", parentId: "doc" },
+    { id: "owners", object: "Владельцы", internal: "_Reference2", parentId: null }
+  ],
+  byId: {},
+  selected: { syntheticBoolean: true },
+  metaById: {
+    syntheticBoolean: {
+      baseTopId: "owner",
+      chain: [{ refInternal: "_Fld2RRef", targetTable: "_Reference2", targetKind: "reference" }],
+      field: { object: "Активен", title: "Активен", internal: "_Fld3", type: "bool" },
+      displayPath: "Владелец.Активен"
+    }
+  },
+  boolFilters: { syntheticBoolean: { yes: true, no: false } }
+};
+syntheticBooleanState.byId = Object.fromEntries(syntheticBooleanState.rows.map(row => [row.id, row]));
+const syntheticBooleanBefore = structuredClone(syntheticBooleanState);
+const syntheticBooleanSnapshot = createProjectSnapshot(syntheticBooleanState, "0.2.2");
+const syntheticBooleanRestored = parseProjectSnapshot(syntheticBooleanSnapshot);
+const productionSyntheticBooleanRestored = loadProductionRuntime().api.parseProjectSnapshot(syntheticBooleanSnapshot);
+assert.deepEqual(syntheticBooleanRestored.selected, { syntheticBoolean: true });
+assert.deepEqual(syntheticBooleanRestored.boolFilters, { syntheticBoolean: { yes: true, no: false } });
+assert.deepEqual(
+  JSON.parse(JSON.stringify(productionSyntheticBooleanRestored.boolFilters)),
+  syntheticBooleanRestored.boolFilters,
+  "Production project parser должен сохранять тот же synthetic boolean filter, что и canonical parser."
+);
+assert.deepEqual(syntheticBooleanRestored.loadDiagnostics, {
+  droppedSelectedIds: [],
+  droppedBoolFilterIds: [],
+  droppedPeriodFieldId: "",
+  recovered: false
+});
+assert.deepEqual(syntheticBooleanState, syntheticBooleanBefore);
+assert.equal("loadDiagnostics" in syntheticBooleanSnapshot, false);
+
+const staleSyntheticFilterProject = structuredClone(syntheticBooleanSnapshot);
+staleSyntheticFilterProject.selection.selected = {};
+staleSyntheticFilterProject.selection.synthetic = {};
+const staleSyntheticFilterRestored = parseProjectSnapshot(staleSyntheticFilterProject);
+assert.deepEqual(staleSyntheticFilterRestored.boolFilters, {});
+assert.deepEqual(staleSyntheticFilterRestored.loadDiagnostics, {
+  droppedSelectedIds: [],
+  droppedBoolFilterIds: ["syntheticBoolean"],
+  droppedPeriodFieldId: "",
+  recovered: true
+});
 
 const applied = loadProductionRuntime();
 const restored = applied.api.applyProjectSnapshot(project);

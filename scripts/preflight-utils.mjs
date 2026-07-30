@@ -34,13 +34,14 @@ export function stagedFiles(root) { return execFileSync("git", ["diff", "--cache
 export function withCandidate(root, callback) {
   const staged = stagedFiles(root);
   if (!staged.length) return callback(root, { staged: false, files: [] });
-  const unstaged = execFileSync("git", ["diff", "--name-only"], { cwd: root, encoding: "utf8" }).trim();
-  if (unstaged) fail("staged candidate has unstaged tracked changes");
+  const unstaged = execFileSync("git", ["diff", "--name-only"], { cwd: root, encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean);
+  const conflicts = staged.filter(file => unstaged.includes(file));
+  if (conflicts.length) fail(`staged candidate has unstaged changes in staged files: ${conflicts.join(", ")}`);
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "sql-bi-preflight-"));
   const archive = path.join(os.tmpdir(), `sql-bi-preflight-${process.pid}-${Date.now()}.tar`);
   try {
     const treeId = execFileSync("git", ["write-tree"], { cwd: root, encoding: "utf8" }).trim();
-    const bytes = execFileSync("git", ["archive", "--format=tar", treeId], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
+    const bytes = execFileSync("git", ["-c", "core.autocrlf=false", "archive", "--format=tar", treeId], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
     fs.writeFileSync(archive, bytes);
     run("tar", ["-xf", archive, "-C", temp], root);
     return callback(temp, { staged: true, files: staged });

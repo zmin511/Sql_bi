@@ -144,8 +144,9 @@ export function parseProjectSnapshot(input) {
   const view = plainObject(project.view);
   const periodFieldId = stringValue(query.periodFieldId);
   const normalizedBoolFilters = boolFilterMap(selection.boolFilters);
+  const validFilterIds = new Set([...ids, ...Object.keys(safeSynthetic)]);
   const droppedSelectedIds = Object.keys(rawSelected).filter(id => !own(selected, id)).sort();
-  const droppedBoolFilterIds = Object.keys(normalizedBoolFilters).filter(id => !ids.has(id)).sort();
+  const droppedBoolFilterIds = Object.keys(normalizedBoolFilters).filter(id => !validFilterIds.has(id)).sort();
   const droppedPeriodFieldId = periodFieldId && !ids.has(periodFieldId) ? periodFieldId : "";
   const loadDiagnostics = {
     droppedSelectedIds,
@@ -157,7 +158,7 @@ export function parseProjectSnapshot(input) {
     rows: normalizedRows,
     selected,
     metaById: safeSynthetic,
-    boolFilters: Object.fromEntries(Object.entries(normalizedBoolFilters).filter(([id]) => ids.has(id))),
+    boolFilters: Object.fromEntries(Object.entries(normalizedBoolFilters).filter(([id]) => validFilterIds.has(id))),
     flatten: booleanMap(selection.flatten),
     expanded: Object.fromEntries(Object.entries(booleanMap(view.expanded)).filter(([id]) => ids.has(id) || own(safeSynthetic, id))),
     search: stringValue(view.search),
