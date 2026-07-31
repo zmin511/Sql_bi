@@ -20,18 +20,20 @@
       font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
       font-size: 13px;
     }
-    .wrap { width:100%; padding: 14px 14px 22px; display:grid; gap:12px; box-sizing:border-box; grid-template-columns: 2fr 1fr; align-items:start; }
+    .wrap { width:100%; padding: 14px 14px 22px; display:grid; gap:12px; box-sizing:border-box; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr); align-items:start; min-height:100vh; }
+    .col-left { min-width:0; display:flex; flex-direction:column; gap:12px; }
+    .col-right { min-width:0; display:flex; flex-direction:column; gap:12px; }
     .span-all { grid-column: 1 / -1; }
     .topbar { grid-column: 1 / -1; display:flex; justify-content:flex-end; align-items:center; gap:10px; color:var(--muted); font-size:12px; }
     .topbar b { color:var(--text); font-size:14px; }
     .topbar a { color:#93c5fd; text-decoration:none; }
     .topbar a:hover { text-decoration:underline; }
     .file-input{ position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
-    @media (max-width: 1100px){ .wrap{ grid-template-columns: 1fr; } .span-all{ grid-column:auto; } }
+    @media (max-width: 1100px){ .wrap{ grid-template-columns: 1fr; } .span-all{ grid-column:auto; } .col-left, .col-right { width:100%; } .tree { max-height: 52vh; } .query-graph-panel { max-height: 38vh; } .sql-output { max-height: 38vh; } }
 
-    .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
-    .card h2 { margin:0; padding:12px 14px; border-bottom:1px solid var(--border); font-size:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .content { padding: 12px 14px; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); display:flex; flex-direction:column; }
+    .card h2 { margin:0; padding:12px 14px; border-bottom:1px solid var(--border); font-size:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .content { padding: 12px 14px; flex:1 1 auto; min-height:0; }
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .grid { display:grid; gap:10px; }
     .cols-2 { grid-template-columns: 1fr 1fr; }
@@ -39,10 +41,17 @@
     .btn.secondary { background:#374151; }
     .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
     .input, select, textarea { background:#0b1220; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:6px 8px; font-size:12px; }
-    textarea { width:100%; height:330px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace; font-size:12px; }
+    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace; font-size:12px; }
     .border { border:1px solid var(--border); border-radius:10px; padding:8px; }
     .pill { font-size:11px; padding:2px 8px; border:1px solid var(--border); border-radius:999px; }
-    .tree { max-height: 56vh; overflow:auto; padding:6px; text-align:left; font-size:12px; }
+    .tree { max-height: 46vh; min-height: 120px; overflow:auto; padding:6px; text-align:left; font-size:12px; }
+    .query-graph-panel { max-height: 34vh; min-height: 80px; overflow:auto; }
+    .query-graph-viewport { min-height: 80px; }
+    .sql-output { width:100%; height: 200px; max-height: 32vh; min-height: 120px; overflow:auto; }
+    .query-plan-panel { max-height: 28vh; overflow:auto; }
+    .period-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 10px; align-items: end; }
+    .period-grid label { display:block; font-size:11px; margin-bottom:4px; }
+    .period-grid input { width:100%; max-width:84px; min-width:0; }
     .tree .node { padding: 2px 0; display:flex; align-items:flex-start; gap:8px; border-radius:8px; }
     .tree .node.node-vt { background: rgba(14,165,233,.055); border-left:3px solid rgba(56,189,248,.42); padding-left:6px; }
     .tree .node.node-ref { background: rgba(34,197,94,.045); border-left:3px solid rgba(74,222,128,.34); padding-left:6px; }
@@ -71,12 +80,13 @@
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
+    <div class="wrap">
+<div class="topbar">
       <b>SQL BI</b>
       <a href="https://github.com/zmin511/Sql_bi" target="_blank" rel="noopener">GitHub</a>
       <span>v0.2.2</span>
     </div>
+    <div class="col-left">
     <div class="card">
       <h2>Структура из XLSX/MXL/XML (единое дерево)
         <span class="row">
@@ -100,10 +110,12 @@
           Логика: галочка на поле-ссылке — выводит GUID. Плюсик раскрывает поля справочника/перечисления прямо в дереве; можно углубляться дальше.
         </div>
         <div id="tree" class="tree border xml"></div>
-        <div id="queryGraphPanel" class="border" style="margin-top:10px"><div id="queryGraphToolbar" class="row"><b id="queryGraphTitle">Query relationships</b><select id="structureViewMode" class="input" style="max-width:160px"><option value="tree">Tree</option><option value="graph">Graph</option><option value="split" selected>Tree + graph</option></select><select id="queryGraphFilter" class="input" style="max-width:160px"><option value="all">All</option><option value="active">Active</option><option value="sql">SQL only</option><option value="errors">Errors</option></select><span id="queryGraphNodeCount"></span><span id="queryGraphEdgeCount"></span></div><div id="queryGraphViewport" style="position:relative;min-height:80px"><svg id="queryGraphSvg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg><div id="queryGraphNodes"></div></div><div id="queryGraphDetails" class="tiny"></div><div id="queryGraphEmpty" class="muted tiny"></div></div>
+        <div id="queryGraphPanel" class="border query-graph-panel" style="margin-top:10px"><div id="queryGraphToolbar" class="row"><b id="queryGraphTitle">Query relationships</b><select id="structureViewMode" class="input" style="max-width:160px"><option value="tree">Tree</option><option value="graph">Graph</option><option value="split" selected>Tree + graph</option></select><select id="queryGraphFilter" class="input" style="max-width:160px"><option value="all">All</option><option value="active">Active</option><option value="sql">SQL only</option><option value="errors">Errors</option></select><span id="queryGraphNodeCount"></span><span id="queryGraphEdgeCount"></span></div><div id="queryGraphViewport" class="query-graph-viewport" style="position:relative;min-height:80px"><svg id="queryGraphSvg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg><div id="queryGraphNodes"></div></div><div id="queryGraphDetails" class="tiny"></div><div id="queryGraphEmpty" class="muted tiny"></div></div>
       </div>
     </div>
-<div class="card">
+    </div>
+    <div class="col-right">
+    <div class="card">
       <h2>Настройки запроса</h2>
 
       <div class="content">
@@ -150,21 +162,21 @@
             </div>
           </div>
 
-          <div id="relativePeriodInputs" class="row" style="gap:10px; align-items:flex-end">
-            <div style="flex:1; min-width:140px">
-              <label class="muted">За последние, мес.</label>
+          <div id="relativePeriodInputs" class="period-grid">
+            <div>
+              <label class="muted" for="periodMonths">Мес. назад</label>
               <input id="periodMonths" type="number" class="input" min="0" value="3"/>
             </div>
-            <div style="flex:1; min-width:140px">
-              <label class="muted">За последние, дней</label>
+            <div>
+              <label class="muted" for="periodDays">Дней назад</label>
               <input id="periodDays" type="number" class="input" min="0" value="0"/>
             </div>
-            <div style="flex:1; min-width:140px">
-              <label class="muted">На предстоящие, мес.</label>
+            <div>
+              <label class="muted" for="periodMonthsFuture">Мес. вперёд</label>
               <input id="periodMonthsFuture" type="number" class="input" min="0" value="0"/>
             </div>
-            <div style="flex:1; min-width:140px">
-              <label class="muted">На предстоящие, дней</label>
+            <div>
+              <label class="muted" for="periodDaysFuture">Дней вперёд</label>
               <input id="periodDaysFuture" type="number" class="input" min="0" value="0"/>
             </div>
           </div>
@@ -185,11 +197,7 @@
         </div>
       </div>
     </div>
-
-    </div>
-
-
-    <div class="card span-all">
+    <div class="card">
       <h2>Результат: SQL
         <span class="row">
           <button class="btn secondary" id="btn-download-power-query" type="button" disabled>Скачать Power Query</button>
@@ -198,10 +206,10 @@
         </span>
       </h2>
       <div class="content">
-        <textarea id="sql" readonly>-- Загрузите структуру и отметьте поля слева</textarea>
+        <textarea id="sql" class="sql-output" readonly>-- Загрузите структуру и отметьте поля слева</textarea>
         <div class="warn" id="sqlHint" style="display:none"></div>
         <div class="border tiny" id="diag" style="display:none; margin-top:8px; white-space:pre-wrap"></div>
-        <div class="border tiny" id="queryPlanPanel" style="margin-top:8px">
+        <div class="border tiny query-plan-panel" id="queryPlanPanel" style="margin-top:8px">
           <h3 style="margin:0 0 6px">Связи запроса</h3>
           <div id="queryPlanStatus">Ожидание выбора полей.</div>
           <div id="queryPlanCounts"></div>
@@ -217,8 +225,7 @@
         </div>
       </div>
     </div>
-
-
+    </div>
   </div>
 
   <script>
