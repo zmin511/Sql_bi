@@ -77,6 +77,37 @@
     .muted { color: var(--muted); }
     .warn { background:#2a1616; border:1px solid #7f1d1d; padding:8px 10px; border-radius:10px; color:#fecaca; font-size:12px; margin-top:8px; }
     .tiny { font-size:11px; }
+
+    /* LOCAL12B focused relationship presentation model */
+    .query-graph-legend { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:11px; color:var(--muted); margin:4px 0; }
+    .query-graph-legend-item { display:inline-flex; align-items:center; gap:5px; }
+    .query-graph-status { font-size:10px; padding:2px 7px; border-radius:999px; border:1px solid var(--border); white-space:nowrap; }
+    .status-active-sql { background:rgba(37,99,235,.22); color:#bfdbfe; border-color:rgba(37,99,235,.5); }
+    .status-active-plan { background:rgba(16,185,129,.2); color:#a7f3d0; border-color:rgba(16,185,129,.5); }
+    .status-available { background:rgba(148,163,184,.16); color:#e2e8f0; border-color:rgba(148,163,184,.4); }
+    .status-warning { background:rgba(245,158,11,.2); color:#fde68a; border-color:rgba(245,158,11,.5); }
+    .status-error { background:rgba(239,68,68,.2); color:#fecaca; border-color:rgba(239,68,68,.5); }
+    .status-selected { background:rgba(96,165,250,.35); color:#e0f2fe; border-color:var(--accent); }
+    .query-graph-reset { margin-left:auto; }
+    .query-graph-nodes { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+    .query-graph-node { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; }
+    .query-graph-node:focus { outline:2px solid var(--accent); }
+    .query-graph-node.focus { outline:2px solid var(--accent); background:var(--panel3); }
+    .query-graph-node.dim { opacity:.35; }
+    .query-graph-node.hidden { display:none; }
+    .query-graph-edges { display:flex; flex-direction:column; gap:5px; margin-bottom:6px; }
+    .query-graph-edge { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; padding:5px 8px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; text-align:left; }
+    .query-graph-edge:focus { outline:2px solid var(--accent); }
+    .query-graph-edge.focus { outline:2px solid var(--accent); background:var(--panel3); }
+    .query-graph-edge.dim { opacity:.35; }
+    .query-graph-edge.hidden { display:none; }
+    .query-graph-edge-meta { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .query-graph-details-card { display:grid; gap:5px; margin-top:8px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--panel2); }
+    .query-graph-details-row { display:grid; grid-template-columns:120px 1fr; gap:8px; }
+    .query-graph-details-label { color:var(--muted); font-size:11px; }
+    .query-graph-details-value { font-size:11px; word-break:break-word; }
+    .query-graph-empty { padding:10px 0; }
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
@@ -110,7 +141,31 @@
           Логика: галочка на поле-ссылке — выводит GUID. Плюсик раскрывает поля справочника/перечисления прямо в дереве; можно углубляться дальше.
         </div>
         <div id="tree" class="tree border xml"></div>
-        <div id="queryGraphPanel" class="border query-graph-panel" style="margin-top:10px"><div id="queryGraphToolbar" class="row"><b id="queryGraphTitle">Query relationships</b><select id="structureViewMode" class="input" style="max-width:160px"><option value="tree">Tree</option><option value="graph">Graph</option><option value="split" selected>Tree + graph</option></select><select id="queryGraphFilter" class="input" style="max-width:160px"><option value="all">All</option><option value="active">Active</option><option value="sql">SQL only</option><option value="errors">Errors</option></select><span id="queryGraphNodeCount"></span><span id="queryGraphEdgeCount"></span></div><div id="queryGraphViewport" class="query-graph-viewport" style="position:relative;min-height:80px"><svg id="queryGraphSvg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg><div id="queryGraphNodes"></div></div><div id="queryGraphDetails" class="tiny"></div><div id="queryGraphEmpty" class="muted tiny"></div></div>
+        <div id="queryGraphPanel" class="border query-graph-panel" style="margin-top:10px">
+          <div id="queryGraphToolbar" class="row" style="flex-wrap:wrap;gap:10px;align-items:center;">
+            <b id="queryGraphTitle">Query relationships</b>
+            <span id="queryGraphLegend" class="query-graph-legend"></span>
+            <select id="structureViewMode" class="input" style="max-width:160px" aria-label="Режим отображения структуры">
+              <option value="tree">Только дерево</option>
+              <option value="graph">Только граф</option>
+              <option value="split" selected>Дерево + граф</option>
+            </select>
+            <select id="queryGraphFilter" class="input" style="max-width:160px" aria-label="Фильтр связей">
+              <option value="all">Все</option>
+              <option value="active">Активные</option>
+              <option value="sql">В SQL</option>
+              <option value="errors">Ошибки</option>
+            </select>
+            <button id="queryGraphResetFocus" class="btn ghost query-graph-reset" type="button" aria-label="Сбросить фокус выбранной связи" style="display:none">Сбросить фокус</button>
+            <span id="queryGraphNodeCount"></span><span id="queryGraphEdgeCount"></span>
+          </div>
+          <div id="queryGraphViewport" class="query-graph-viewport" style="position:relative;min-height:80px">
+            <svg id="queryGraphSvg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg>
+            <div id="queryGraphNodes"></div>
+          </div>
+          <div id="queryGraphDetails" class="tiny query-graph-details-card"></div>
+          <div id="queryGraphEmpty" class="muted tiny query-graph-empty"></div>
+        </div>
       </div>
     </div>
     </div>
@@ -2639,8 +2694,9 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       metaById:{},       // для синтетических узлов
       referenceDiagnostics:{}, // nodeId -> сообщение безопасного разрешения ссылки
       boolFilters:{},    // id -> {yes,no}
-      queryPlan:null, queryResult:null, queryGraph:{viewMode:"split",graphFilter:"all"}
-    ,flatten:{}    // tableName -> true (режим "Плоская" для _VT)
+      queryPlan:null, queryResult:null, queryGraph:{viewMode:"split",graphFilter:"all"},
+      queryGraphFocus:{kind:null,id:null},
+      flatten:{}    // tableName -> true (режим "Плоская" для _VT)
     };
 
     const $ = (id)=>document.getElementById(id);
@@ -2716,7 +2772,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       state.rows = rows;
       const built = buildTree(rows);
       state.byId=built.byId; state.children=built.children; state.roots=built.roots;
-      state.selected={}; state.expanded={}; state.metaById={}; state.referenceDiagnostics={}; state.boolFilters={}; state.flatten={};
+      state.selected={}; state.expanded={}; state.metaById={}; state.referenceDiagnostics={}; state.boolFilters={}; state.flatten={}; state.queryGraphFocus={kind:null,id:null};
       state.periodFieldId="";
       state.dateFrom=""; state.dateTo="";
       if($("dateFrom")) $("dateFrom").value="";
@@ -2737,7 +2793,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       state.dateFrom=restored.dateFrom; state.dateTo=restored.dateTo;
       state.periodMonths=restored.periodMonths; state.periodDays=restored.periodDays;
       state.periodMonthsFuture=restored.periodMonthsFuture; state.periodDaysFuture=restored.periodDaysFuture;
-      state.refDepth=restored.refDepth; state.relationMode=restored.relationMode; state.queryGraph=restored.queryGraph;
+      state.refDepth=restored.refDepth; state.relationMode=restored.relationMode; state.queryGraph=restored.queryGraph; state.queryGraphFocus={kind:null,id:null};
 
       $("search").value=state.search;
       $("serverName").value=state.serverName; $("dbName").value=state.dbName; $("schema").value=state.schema; $("fromTable").value=state.fromTable;
@@ -4024,7 +4080,163 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     }
 
     function buildQueryGraphModel(input={}){ const selected=new Set(input.selectedIds||[]),plan=input.queryPlan||null,nodes=[],edges=[],activeNodeIds=[],activeEdgeIds=[]; (input.rows||[]).forEach(row=>{const id=`row:${row.id}`,active=selected.has(row.id),kind=row.parentId&&String(row.internal||"").startsWith("_Fld")?"physical_field":String(row.internal||"").includes("_VT")?"table_part":"table";nodes.push({id,kind,rowId:row.id,syntheticId:null,table:row.internal||row.object||"",field:kind==="physical_field"?(row.internal||row.object||""):null,label:row.title||row.object||row.internal||row.id,status:active?"active":"normal",selected:active,depth:row.parentId?1:0});if(active)activeNodeIds.push(id);if(row.parentId)edges.push({id:`tree:${row.parentId}:${row.id}`,kind:"tree",sourceId:`row:${row.parentId}`,targetId:id,status:"normal",reason:null,confirmation:null,joinId:null,depth:0,label:"contains"});}); Object.entries(input.metaById||{}).forEach(([syntheticId,meta])=>{if(!selected.has(syntheticId))return;const id=`synth:${syntheticId}`;nodes.push({id,kind:"synthetic_field",rowId:null,syntheticId,table:null,field:meta.field&&meta.field.internal||null,label:meta.displayPath||syntheticId,status:"active",selected:true,depth:(meta.chain||[]).length});activeNodeIds.push(id);}); (plan&&plan.joins||[]).forEach(join=>{const edge={id:`join:${join.id}`,kind:join.kind==="header_detail"?"header_detail":"reference",sourceId:join.sourceRowId?`row:${join.sourceRowId}`:`join-source:${join.id}`,targetId:join.targetRootId?`row:${join.targetRootId}`:`join-target:${join.id}`,status:join.status||"blocked",reason:join.reason||null,confirmation:join.confirmation||null,joinId:join.id,depth:join.depth||0,label:join.sql||join.reason||"relationship"};edges.push(edge);if(join.status==="sql"||(join.syntheticIds||[]).some(id=>selected.has(id))){activeEdgeIds.push(edge.id);activeNodeIds.push(edge.sourceId,edge.targetId);}}); return {status:plan&&plan.status||"empty",reason:plan&&plan.reason||null,nodes,edges,activeNodeIds:[...new Set(activeNodeIds)],activeEdgeIds,diagnostics:plan&&plan.diagnostics||[]}; }
-    function renderQueryGraph(model=buildQueryGraphModel({rows:state.rows,byId:state.byId,children:state.children,roots:state.roots,selectedIds:Object.keys(state.selected).filter(id=>state.selected[id]),metaById:state.metaById,queryPlan:state.queryPlan})){const filter=$("queryGraphFilter").value||"all",visible=model.edges.filter(edge=>filter==="all"||filter==="active"&&model.activeEdgeIds.includes(edge.id)||filter==="sql"&&edge.status==="sql"||filter==="errors"&&edge.status!=="sql"&&edge.kind!=="tree");$("queryGraphNodes").textContent=model.nodes.map(node=>`${node.status}: ${node.label}`).join("\n");$("queryGraphNodeCount").textContent=`Nodes: ${model.nodes.length}`;$("queryGraphEdgeCount").textContent=`Edges: ${visible.length}`;$("queryGraphDetails").textContent=visible.map(edge=>`${edge.kind} ${edge.status}: ${edge.label}`).join("\n");$("queryGraphEmpty").textContent=visible.length?"":"No relationships to display.";$("queryGraphSvg").innerHTML=visible.map((edge,index)=>`<line data-edge-id="${edge.id}" x1="0" y1="${12+index*12}" x2="100" y2="${12+index*12}" stroke="${edge.status==="sql"?"#2563eb":"#b45309"}"/>`).join("");return model;}
+    function relationshipStatusLabel(status){ return ({"active-sql":"В SQL","active-plan":"В плане","available":"Доступна","warning":"Предупреждение","error":"Ошибка","unknown":"Не определён","selected":"Выбран"})[status] || status || "Не определён"; }
+    function normalizeRelationshipStatus(item, model){
+      if(!item || !model) return "unknown";
+      const status = item.status;
+      if(status === "sql" || item.selected) return "active-sql";
+      if(item.kind === "edge"){
+        if(model.activeEdgeIds.includes(item.id)) return "active-plan";
+        if(status === "blocked" || status === "error") return "error";
+        if(status === "warning") return "warning";
+        if(status === "normal") return "available";
+        return "unknown";
+      }
+      if(model.activeNodeIds.includes(item.id)) return "active-plan";
+      if(status === "blocked" || status === "error") return "error";
+      if(status === "warning") return "warning";
+      if(status === "normal" || status === "active") return "available";
+      return "unknown";
+    }
+    function nodeLabel(node){ return node ? (node.label || node.table || node.id || "—") : "—"; }
+    function edgeKindLabel(kind){ if(kind === "tree") return "Структурная"; if(kind === "header_detail") return "Шапка–табличная часть"; if(kind === "reference") return "Справочник"; return kind || "Связь"; }
+    function edgeSourceTarget(edge, model){ if(!edge || !model) return {source:"—",target:"—"}; const s=model.nodes.find(n=>n.id===edge.sourceId); const t=model.nodes.find(n=>n.id===edge.targetId); return {source: s?nodeLabel(s):edge.sourceId, target: t?nodeLabel(t):edge.targetId}; }
+    function edgeLabel(edge){ if(!edge) return ""; if(edge.reason) return edge.reason; if(edge.confirmation) return edge.confirmation; return edge.label || ""; }
+    function buildRelationshipDetails(item, model){
+      if(!item) return [];
+      const status = normalizeRelationshipStatus(item, model);
+      const lines = [{label:"Статус", value:relationshipStatusLabel(status)}];
+      if(item.kind === "edge"){
+        lines.push({label:"Тип связи", value:edgeKindLabel(item.kind)});
+        const st = edgeSourceTarget(item, model);
+        lines.push({label:"Источник", value:st.source});
+        lines.push({label:"Цель", value:st.target});
+        if(item.field) lines.push({label:"Поле связи", value:item.field});
+        if(item.confirmation) lines.push({label:"Подтверждение", value:item.confirmation});
+        if(item.joinId && (item.status === "sql" || (model.activeEdgeIds||[]).includes(item.id))) lines.push({label:"Используется в query plan", value:"да"});
+        if(item.status === "sql") lines.push({label:"Используется в SQL", value:"да"});
+        if(item.reason) lines.push({label:"Причина", value:item.reason});
+        const related = (model.diagnostics||[]).filter(d => String(d).includes(item.joinId || item.id));
+        if(related.length) lines.push({label:"Диагностика", value:related.join("; ")});
+      } else {
+        if(item.kind) lines.push({label:"Тип", value:item.kind});
+        if(item.table) lines.push({label:"Таблица", value:item.table});
+        if(item.field) lines.push({label:"Поле", value:item.field});
+        if(item.selected) lines.push({label:"Выбрано", value:"да"});
+        if(item.depth !== undefined && item.depth !== null) lines.push({label:"Глубина", value:String(item.depth)});
+      }
+      return lines;
+    }
+    function setQueryGraphFocus(kind, id){ state.queryGraphFocus = {kind:kind || null, id:id || null}; renderQueryGraph(); }
+    function clearQueryGraphFocus(){ state.queryGraphFocus = {kind:null, id:null}; renderQueryGraph(); }
+    function renderQueryGraphLegend(){
+      const legend = $("queryGraphLegend");
+      if(!legend) return;
+      const statuses = ["active-sql","active-plan","available","warning","error"];
+      legend.innerHTML = statuses.map(status => `<span class="query-graph-legend-item"><span class="query-graph-status status-${status}"></span>${escapeHtml(relationshipStatusLabel(status))}</span>`).join("");
+    }
+    function renderQueryGraphNodes(model, visibleNodeIds, focusedId, dimIds){
+      const host = $("queryGraphNodes");
+      if(!host) return;
+      if(!model.nodes.length){ host.innerHTML = ""; return; }
+      const maxLen = 48;
+      const isDim = id => dimIds && dimIds.has(id);
+      const isFocus = id => focusedId === id;
+      host.innerHTML = `<div class="query-graph-nodes" role="list" aria-label="Узлы связей">${model.nodes.map(node => {
+        const visible = visibleNodeIds.has(node.id);
+        const status = normalizeRelationshipStatus(node, model);
+        const label = nodeLabel(node);
+        const shortLabel = label.length > maxLen ? label.slice(0, maxLen-1) + "…" : label;
+        const classes = ["query-graph-node", `status-${status}`, visible ? "" : "hidden", isFocus(node.id) ? "focus" : "", isDim(node.id) ? "dim" : ""].filter(Boolean).join(" ");
+        return `<button type="button" class="${classes}" role="listitem" data-node-id="${escapeHtml(node.id)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(node.kind || "узел")} ${escapeHtml(label)} ${escapeHtml(relationshipStatusLabel(status))}" tabindex="0">${escapeHtml(shortLabel)}</button>`;
+      }).join("")}</div>`;
+      host.querySelectorAll && host.querySelectorAll("[data-node-id]").forEach(btn => {
+        btn.addEventListener && btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-node-id");
+          if(state.queryGraphFocus && state.queryGraphFocus.id === id && state.queryGraphFocus.kind === "node") clearQueryGraphFocus();
+          else setQueryGraphFocus("node", id);
+        });
+      });
+    }
+    function renderQueryGraphEdges(model, visibleEdges, focusedId, dimIds){
+      const host = $("queryGraphNodes");
+      if(!host) return;
+      const existing = host.innerHTML || "";
+      const isDim = id => dimIds && dimIds.has(id);
+      const isFocus = id => focusedId === id;
+      const edgeHtml = visibleEdges.length ? `<div class="query-graph-edges" role="list" aria-label="Связи">${visibleEdges.map(edge => {
+        const status = normalizeRelationshipStatus(edge, model);
+        const st = edgeSourceTarget(edge, model);
+        const label = edgeLabel(edge);
+        const classes = ["query-graph-edge", `status-${status}`, isFocus(edge.id) ? "focus" : "", isDim(edge.id) ? "dim" : ""].filter(Boolean).join(" ");
+        return `<button type="button" class="${classes}" role="listitem" data-edge-id="${escapeHtml(edge.id)}" aria-label="${escapeHtml(edgeKindLabel(edge.kind))} ${escapeHtml(relationshipStatusLabel(status))}" tabindex="0">
+          <span class="query-graph-status status-${status}">${escapeHtml(relationshipStatusLabel(status))}</span>
+          <span class="query-graph-edge-meta">${escapeHtml(st.source)} &rarr; ${escapeHtml(st.target)}${label ? ` &bull; ${escapeHtml(label)}` : ""}</span>
+          <span class="query-graph-edge-kind muted">${escapeHtml(edgeKindLabel(edge.kind))}</span>
+        </button>`;
+      }).join("")}</div>` : "";
+      host.innerHTML = existing + edgeHtml;
+      host.querySelectorAll && host.querySelectorAll("[data-edge-id]").forEach(btn => {
+        btn.addEventListener && btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-edge-id");
+          if(state.queryGraphFocus && state.queryGraphFocus.id === id && state.queryGraphFocus.kind === "edge") clearQueryGraphFocus();
+          else setQueryGraphFocus("edge", id);
+        });
+      });
+    }
+    function renderQueryGraphDetails(model){
+      const host = $("queryGraphDetails");
+      if(!host) return;
+      const focus = state.queryGraphFocus || {kind:null, id:null};
+      if(!focus.id){ host.innerHTML = ""; return; }
+      let item = null;
+      if(focus.kind === "node") item = model.nodes.find(n => n.id === focus.id);
+      else if(focus.kind === "edge") item = model.edges.find(e => e.id === focus.id);
+      if(!item){ host.innerHTML = `<div class="query-graph-empty">Выбранный элемент не отображается текущим фильтром.</div>`; return; }
+      const details = buildRelationshipDetails(item, model);
+      host.innerHTML = `<div class="query-graph-details-card">${details.map(row => `<div class="query-graph-details-row"><div class="query-graph-details-label">${escapeHtml(row.label)}</div><div class="query-graph-details-value">${escapeHtml(row.value)}</div></div>`).join("")}</div>`;
+    }
+    function renderQueryGraph(model = buildQueryGraphModel({rows:state.rows, byId:state.byId, children:state.children, roots:state.roots, selectedIds:Object.keys(state.selected).filter(id=>state.selected[id]), metaById:state.metaById, queryPlan:state.queryPlan})){
+      const filter = state.queryGraph.graphFilter || "all";
+      const visibleEdges = model.edges.filter(edge => filter === "all" || (filter === "active" && model.activeEdgeIds.includes(edge.id)) || (filter === "sql" && edge.status === "sql") || (filter === "errors" && edge.status !== "sql" && edge.kind !== "tree"));
+      const visibleNodeIds = new Set();
+      if(filter === "all"){ model.nodes.forEach(n => visibleNodeIds.add(n.id)); }
+      else { visibleEdges.forEach(e => { visibleNodeIds.add(e.sourceId); visibleNodeIds.add(e.targetId); }); if(filter !== "errors"){ model.nodes.forEach(n => { if(model.activeNodeIds.includes(n.id) || n.selected) visibleNodeIds.add(n.id); }); } }
+      const focus = state.queryGraphFocus || {kind:null, id:null};
+      let focusValid = false;
+      if(focus.id){ if(focus.kind === "node") focusValid = visibleNodeIds.has(focus.id); else if(focus.kind === "edge") focusValid = visibleEdges.some(e => e.id === focus.id); }
+      if(focus.id && !focusValid){ state.queryGraphFocus = {kind:null, id:null}; }
+      const focusedId = (state.queryGraphFocus || {}).id;
+      const focusedKind = (state.queryGraphFocus || {}).kind;
+      let dimIds = null;
+      if(focusedId){
+        dimIds = new Set();
+        const relatedNodes = new Set(), relatedEdges = new Set();
+        if(focusedKind === "node"){
+          relatedNodes.add(focusedId);
+          model.edges.forEach(e => { if(e.sourceId === focusedId || e.targetId === focusedId){ relatedEdges.add(e.id); relatedNodes.add(e.sourceId); relatedNodes.add(e.targetId); } });
+        } else if(focusedKind === "edge"){
+          const edge = model.edges.find(e => e.id === focusedId);
+          if(edge){ relatedEdges.add(edge.id); relatedNodes.add(edge.sourceId); relatedNodes.add(edge.targetId); }
+        }
+        model.nodes.forEach(n => { if(!relatedNodes.has(n.id)) dimIds.add(n.id); });
+        model.edges.forEach(e => { if(!relatedEdges.has(e.id)) dimIds.add(e.id); });
+      }
+      renderQueryGraphLegend();
+      if($("queryGraphNodes")) $("queryGraphNodes").textContent = "";
+      renderQueryGraphNodes(model, visibleNodeIds, focusedKind === "node" ? focusedId : null, dimIds);
+      renderQueryGraphEdges(model, visibleEdges, focusedKind === "edge" ? focusedId : null, dimIds);
+      renderQueryGraphDetails(model);
+      $("queryGraphNodeCount").textContent = `Узлов: ${model.nodes.length}`;
+      $("queryGraphEdgeCount").textContent = `Связей: ${visibleEdges.length}`;
+      const reset = $("queryGraphResetFocus");
+      if(reset) reset.style.display = focusedId ? "inline-block" : "none";
+      if(!model.edges.length && !model.nodes.length){ $("queryGraphEmpty").textContent = "Структура не загружена или не содержит связей."; }
+      else if(!visibleEdges.length){ $("queryGraphEmpty").textContent = "Выбранный фильтр не нашёл связей."; }
+      else { $("queryGraphEmpty").textContent = ""; }
+      $("queryGraphSvg").innerHTML = visibleEdges.map((edge, index) => `<line data-edge-id="${escapeHtml(edge.id)}" x1="0" y1="${12 + index * 12}" x2="100" y2="${12 + index * 12}" stroke="${edge.status === "sql" ? "#2563eb" : "#b45309"}"/>`).join("");
+      return model;
+    }
     function buildCanonicalInputFromState(){ return { rows:state.rows, byId:state.byId, selected:{...state.selected}, metaById:state.metaById, boolFilters:state.boolFilters, refDepth:state.refDepth, schema:state.schema, dbName:state.dbName, fromTable:state.fromTable, periodFieldId:state.periodFieldId, periodMode:state.periodMode, periodMonths:state.periodMonths, periodDays:state.periodDays, periodMonthsFuture:state.periodMonthsFuture, periodDaysFuture:state.periodDaysFuture, dateFrom:state.dateFrom, dateTo:state.dateTo }; }
     function renderQueryPlanPanel(plan){
       const status=$("queryPlanStatus"),counts=$("queryPlanCounts"),joins=$("queryPlanJoins"),projected=$("queryPlanProjectedFields"),empty=$("queryPlanProjectedFieldsEmpty");
@@ -4115,6 +4327,8 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     $("relationMode").onchange = (e)=>{ state.relationMode = e.target.value; renderSQL(); };
     $("queryGraphFilter").onchange = e=>{ state.queryGraph.graphFilter=requireCanonicalProjectApi().normalizeVisualizationSettings({graphFilter:e.target.value,viewMode:state.queryGraph.viewMode}).graphFilter; renderQueryGraph(); };
     $("structureViewMode").onchange = e=>{ state.queryGraph.viewMode=requireCanonicalProjectApi().normalizeVisualizationSettings({viewMode:e.target.value,graphFilter:state.queryGraph.graphFilter}).viewMode; const graph=$("queryGraphPanel"),tree=$("tree"); graph.style.display=state.queryGraph.viewMode==="tree"?"none":"block"; tree.style.display=state.queryGraph.viewMode==="graph"?"none":"block"; renderQueryGraph(); };
+    $("queryGraphResetFocus").onclick = ()=> clearQueryGraphFocus();
+    $("queryGraphResetFocus").onclick = ()=> clearQueryGraphFocus();
 
     $("btn-copy").onclick = async ()=>{
       const ta=$("sql");
