@@ -4129,6 +4129,24 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     }
     function setQueryGraphFocus(kind, id){ state.queryGraphFocus = {kind:kind || null, id:id || null}; renderQueryGraph(); }
     function clearQueryGraphFocus(){ state.queryGraphFocus = {kind:null, id:null}; renderQueryGraph(); }
+    function bindQueryGraphInteractions(){
+      const host = $("queryGraphNodes");
+      if(!host || !host.querySelectorAll) return;
+      host.querySelectorAll("[data-node-id]").forEach(btn => {
+        btn.addEventListener && btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-node-id");
+          if(state.queryGraphFocus && state.queryGraphFocus.id === id && state.queryGraphFocus.kind === "node") clearQueryGraphFocus();
+          else setQueryGraphFocus("node", id);
+        });
+      });
+      host.querySelectorAll("[data-edge-id]").forEach(btn => {
+        btn.addEventListener && btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-edge-id");
+          if(state.queryGraphFocus && state.queryGraphFocus.id === id && state.queryGraphFocus.kind === "edge") clearQueryGraphFocus();
+          else setQueryGraphFocus("edge", id);
+        });
+      });
+    }
     function renderQueryGraphLegend(){
       const legend = $("queryGraphLegend");
       if(!legend) return;
@@ -4150,13 +4168,6 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
         const classes = ["query-graph-node", `status-${status}`, visible ? "" : "hidden", isFocus(node.id) ? "focus" : "", isDim(node.id) ? "dim" : ""].filter(Boolean).join(" ");
         return `<button type="button" class="${classes}" role="listitem" data-node-id="${escapeHtml(node.id)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(node.kind || "узел")} ${escapeHtml(label)} ${escapeHtml(relationshipStatusLabel(status))}" tabindex="0">${escapeHtml(shortLabel)}</button>`;
       }).join("")}</div>`;
-      host.querySelectorAll && host.querySelectorAll("[data-node-id]").forEach(btn => {
-        btn.addEventListener && btn.addEventListener("click", () => {
-          const id = btn.getAttribute("data-node-id");
-          if(state.queryGraphFocus && state.queryGraphFocus.id === id && state.queryGraphFocus.kind === "node") clearQueryGraphFocus();
-          else setQueryGraphFocus("node", id);
-        });
-      });
     }
     function renderQueryGraphEdges(model, visibleEdges, focusedId, dimIds){
       const host = $("queryGraphNodes");
@@ -4176,13 +4187,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
         </button>`;
       }).join("")}</div>` : "";
       host.innerHTML = existing + edgeHtml;
-      host.querySelectorAll && host.querySelectorAll("[data-edge-id]").forEach(btn => {
-        btn.addEventListener && btn.addEventListener("click", () => {
-          const id = btn.getAttribute("data-edge-id");
-          if(state.queryGraphFocus && state.queryGraphFocus.id === id && state.queryGraphFocus.kind === "edge") clearQueryGraphFocus();
-          else setQueryGraphFocus("edge", id);
-        });
-      });
+      bindQueryGraphInteractions();
     }
     function renderQueryGraphDetails(model){
       const host = $("queryGraphDetails");
@@ -4328,6 +4333,9 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     $("queryGraphFilter").onchange = e=>{ state.queryGraph.graphFilter=requireCanonicalProjectApi().normalizeVisualizationSettings({graphFilter:e.target.value,viewMode:state.queryGraph.viewMode}).graphFilter; renderQueryGraph(); };
     $("structureViewMode").onchange = e=>{ state.queryGraph.viewMode=requireCanonicalProjectApi().normalizeVisualizationSettings({viewMode:e.target.value,graphFilter:state.queryGraph.graphFilter}).viewMode; const graph=$("queryGraphPanel"),tree=$("tree"); graph.style.display=state.queryGraph.viewMode==="tree"?"none":"block"; tree.style.display=state.queryGraph.viewMode==="graph"?"none":"block"; renderQueryGraph(); };
     $("queryGraphResetFocus").onclick = ()=> clearQueryGraphFocus();
+    window.addEventListener("keydown", event => {
+      if(event.key === "Escape" && state.queryGraphFocus && state.queryGraphFocus.id) clearQueryGraphFocus();
+    });
     $("queryGraphResetFocus").onclick = ()=> clearQueryGraphFocus();
 
     $("btn-copy").onclick = async ()=>{

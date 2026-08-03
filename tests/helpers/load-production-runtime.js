@@ -2,7 +2,10 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 function createElement(id = "") {
-  return {
+  const listeners = new Map();
+  let html = "";
+  let descendants = [];
+  const element = {
     id,
     style: {},
     dataset: {},
@@ -13,7 +16,6 @@ function createElement(id = "") {
     checked: false,
     disabled: false,
     textContent: "",
-    innerHTML: "",
     files: [],
     className: "",
     classList: {
@@ -37,7 +39,9 @@ function createElement(id = "") {
       return child;
     },
     remove() {},
-    click() {},
+    click() {
+      this.dispatchEvent({ type: "click" });
+    },
     select() {},
     focus() {},
     setAttribute(name, value) {
@@ -49,15 +53,44 @@ function createElement(id = "") {
     removeAttribute(name) {
       delete this[name];
     },
-    addEventListener() {},
-    querySelectorAll() {
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(listener);
+    },
+    dispatchEvent(event) {
+      const normalized = typeof event === "string" ? { type: event } : event;
+      if (!normalized || !normalized.type) throw new TypeError("Event type is required.");
+      normalized.target ??= this;
+      normalized.currentTarget = this;
+      for (const listener of listeners.get(normalized.type) || []) listener.call(this, normalized);
+      return true;
+    },
+    querySelectorAll(selector) {
+      if (selector === "[data-node-id]") return descendants.filter(item => item.getAttribute("data-node-id") !== null);
+      if (selector === "[data-edge-id]") return descendants.filter(item => item.getAttribute("data-edge-id") !== null);
       return [];
     }
   };
+  Object.defineProperty(element, "innerHTML", {
+    get() {
+      return html;
+    },
+    set(value) {
+      html = String(value);
+      descendants = [];
+      for (const match of html.matchAll(/<button\b([^>]*)>/gi)) {
+        const child = createElement("button");
+        for (const attribute of match[1].matchAll(/([:\w-]+)="([^"]*)"/g)) child.setAttribute(attribute[1], attribute[2]);
+        descendants.push(child);
+      }
+    }
+  });
+  return element;
 }
 
 function createBrowserSandbox() {
   const elements = new Map();
+  const windowListeners = new Map();
 
   const document = {
     body: createElement("body"),
@@ -116,7 +149,18 @@ function createBrowserSandbox() {
     },
     clearTimeout() {},
     queueMicrotask(callback) { callback(); },
-    addEventListener() {}
+    addEventListener(type, listener) {
+      if (!windowListeners.has(type)) windowListeners.set(type, []);
+      windowListeners.get(type).push(listener);
+    },
+    dispatchEvent(event) {
+      const normalized = typeof event === "string" ? { type: event } : event;
+      if (!normalized || !normalized.type) throw new TypeError("Event type is required.");
+      normalized.target ??= sandbox;
+      normalized.currentTarget = sandbox;
+      for (const listener of windowListeners.get(normalized.type) || []) listener.call(sandbox, normalized);
+      return true;
+    }
   };
 
   sandbox.window = sandbox;
