@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import http from "node:http";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { spawn, spawnSync } from "node:child_process";
 import { createProjectSnapshot } from "../src/core/project.js";
+import { CdpClient, MockWebSocket, listenServer, closeServer, recoverOwnedProfiles, launchBrowserPage, cleanupAttempt, launchLayerSelfTests, PROFILE_MARKER, PROFILE_SCHEMA, controlledFailureSelfTest } from "./helpers/browser-launch-layer.mjs";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -44,75 +42,6 @@ function withTimeout(promise, milliseconds, operation, detail = "") {
   ]);
 }
 
-function browserExecutable() {
-  const candidates = [
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe"
-  ];
-  const executable = candidates.find(candidate => fs.existsSync(candidate));
-  if (!executable) throw new Error("Microsoft Edge or Google Chrome is required for browser characterization.");
-  return executable;
-}
-
-async function availablePort() {
-  const server = net.createServer();
-  await withTimeout(new Promise((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject)), TIMEOUTS.serverStart, "temporary port server startup", "127.0.0.1:0");
-  const { port } = server.address();
-  await withTimeout(new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())), TIMEOUTS.serverClose, "temporary port server close", `127.0.0.1:${port}`);
-  return port;
-}
-
-async function listenServer(server, host = "127.0.0.1", port = 0, timeout = TIMEOUTS.serverStart) {
-  await withTimeout(new Promise((resolve, reject) => {
-    const onError = error => { server.off("listening", onListening); reject(error); };
-    const onListening = () => { server.off("error", onError); resolve(); };
-    server.once("error", onError);
-    server.once("listening", onListening);
-    server.listen(port, host);
-  }), timeout, "server startup", `${host}:${port}`);
-  return server.address().port;
-}
-
-async function closeServer(server, sockets, timeout = TIMEOUTS.serverClose) {
-  if (!server.listening) return;
-  const closing = new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
-  server.closeIdleConnections?.();
-  try {
-    await withTimeout(closing, timeout, "server close", `activeConnections=${sockets.size}`);
-  } catch (error) {
-    for (const socket of sockets) socket.destroy();
-    await withTimeout(closing, timeout, "forced server close", `activeConnections=${sockets.size}`);
-    if (server.listening) throw error;
-  }
-}
-
-async function waitForJson(url, attempts = 100) {
-  let lastError;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) return response.json();
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(50);
-  }
-  throw lastError || new Error(`Timed out waiting for ${url}`);
-}
-
-async function waitForPageTarget(url) {
-  const started = Date.now();
-  while (Date.now() - started < TIMEOUTS.launch) {
-    const targets = await waitForJson(url, 5);
-    const target = targets.find(item => item.type === "page" && item.webSocketDebuggerUrl);
-    if (target) return target;
-    await delay(50);
-  }
-  throw new Error(`Browser page target timed out after ${TIMEOUTS.launch}ms (${url})`);
-}
-
 async function waitForEvent(client, predicate, operation, timeout = 1000) {
   const started = Date.now();
   while (Date.now() - started < timeout) {
@@ -121,90 +50,6 @@ async function waitForEvent(client, predicate, operation, timeout = 1000) {
     await delay(10);
   }
   throw new Error(`${operation} event timed out after ${timeout}ms`);
-}
-
-class CdpClient {
-  constructor(url, Socket = WebSocket) {
-    this.socket = new Socket(url);
-    this.nextId = 1;
-    this.pending = new Map();
-    this.events = [];
-    this.closing = false;
-  }
-
-  async open() {
-    await withTimeout(new Promise((resolve, reject) => {
-      this.socket.addEventListener("open", resolve, { once: true });
-      this.socket.addEventListener("error", reject, { once: true });
-    }), TIMEOUTS.cdp, "CDP WebSocket connection", this.socket.url);
-    this.socket.addEventListener("message", event => {
-      const message = JSON.parse(event.data);
-      if (message.id) {
-        const pending = this.pending.get(message.id);
-        if (!pending) return;
-        this.pending.delete(message.id);
-        if (message.error) pending.reject(new Error(message.error.message));
-        else pending.resolve(message.result);
-      } else {
-        this.events.push(message);
-        if (message.method === "Page.javascriptDialogOpening") {
-          this.command("Page.handleJavaScriptDialog", { accept: true }).catch(() => {});
-        }
-      }
-    });
-    this.socket.addEventListener("close", () => { if (!this.closing) this.rejectPending(new Error("CDP WebSocket closed")); });
-    this.socket.addEventListener("error", () => { if (!this.closing) this.rejectPending(new Error("CDP WebSocket failed")); });
-  }
-
-  command(method, params = {}, timeout = TIMEOUTS.cdp) {
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`CDP command ${method} timed out after ${timeout}ms`));
-      }, timeout);
-      this.pending.set(id, {
-        resolve: value => { clearTimeout(timer); resolve(value); },
-        reject: error => { clearTimeout(timer); reject(error); }
-      });
-      this.socket.send(JSON.stringify({ id, method, params }));
-    });
-  }
-
-  rejectPending(error) {
-    for (const pending of this.pending.values()) pending.reject(error);
-    this.pending.clear();
-  }
-
-  close() {
-    this.closing = true;
-    this.rejectPending(new Error("CDP client closed by suite cleanup"));
-    if (this.socket.readyState < WebSocket.CLOSING) this.socket.close();
-  }
-}
-
-class MockWebSocket {
-  static CONNECTING = 0;
-  static OPEN = 1;
-  static CLOSING = 2;
-  constructor(url) {
-    this.url = url;
-    this.readyState = MockWebSocket.CONNECTING;
-    this.listeners = new Map();
-    queueMicrotask(() => { this.readyState = MockWebSocket.OPEN; this.emit("open", {}); });
-  }
-  addEventListener(type, listener, options = {}) {
-    const entries = this.listeners.get(type) || [];
-    entries.push({ listener, once: Boolean(options.once) });
-    this.listeners.set(type, entries);
-  }
-  emit(type, event) {
-    const entries = [...(this.listeners.get(type) || [])];
-    this.listeners.set(type, entries.filter(entry => !entry.once));
-    for (const entry of entries) entry.listener(event);
-  }
-  send() {}
-  close() { this.readyState = MockWebSocket.CLOSING; this.emit("close", {}); }
 }
 
 async function cdpLifecycleSelfTest(signal) {
@@ -452,32 +297,6 @@ async function pressEscape(client) {
   await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 }
 
-const PROFILE_MARKER = ".sql-bi-browser-harness-owned.json";
-const PROFILE_SCHEMA = 1;
-
-function processIsAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try { process.kill(pid, 0); return true; } catch { return false; }
-}
-
-function recoverOwnedProfiles(root) {
-  const result = { removed: [], retained: [], ignored: [] };
-  fs.mkdirSync(root, { recursive: true });
-  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !entry.name.startsWith("sql-bi-browser-")) continue;
-    const directory = path.join(root, entry.name);
-    const markerPath = path.join(directory, PROFILE_MARKER);
-    if (!fs.existsSync(markerPath)) { result.ignored.push(directory); continue; }
-    let marker;
-    try { marker = JSON.parse(fs.readFileSync(markerPath, "utf8")); } catch { result.ignored.push(directory); continue; }
-    if (marker.schema !== PROFILE_SCHEMA || marker.harness !== "browser-query-graph") { result.ignored.push(directory); continue; }
-    if (processIsAlive(marker.pid)) { result.retained.push(directory); continue; }
-    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
-    result.removed.push(directory);
-  }
-  return result;
-}
-
 function leftoverRecoverySelfTest(root) {
   fs.mkdirSync(root, { recursive: true });
   const owned = fs.mkdtempSync(path.join(root, "sql-bi-browser-stale-test-"));
@@ -487,30 +306,6 @@ function leftoverRecoverySelfTest(root) {
   assert.equal(fs.existsSync(owned), false);
   assert.equal(fs.existsSync(unowned), true);
   fs.rmSync(unowned, { recursive: true, force: true });
-  return result;
-}
-
-async function portIsClosed(port) {
-  return new Promise(resolve => {
-    const socket = net.createConnection({ host: "127.0.0.1", port });
-    socket.setTimeout(500);
-    socket.once("connect", () => { socket.destroy(); resolve(false); });
-    socket.once("error", () => resolve(true));
-    socket.once("timeout", () => { socket.destroy(); resolve(true); });
-  });
-}
-
-async function controlledFailureSelfTest() {
-  const childPath = fileURLToPath(new URL("./helpers/browser-harness-controlled-failure.mjs", import.meta.url));
-  const child = spawnSync(process.execPath, [childPath], { encoding: "utf8", timeout: TIMEOUTS.cleanup });
-  assert.equal(child.status, 23, `controlled failure child exit: ${child.status}; stderr=${child.stderr}`);
-  const result = JSON.parse(child.stdout.trim().split(/\r?\n/).at(-1));
-  assert.equal(result.errorMessage, "controlled browser harness failure");
-  assert.equal(result.profileRemoved, true);
-  assert.equal(result.serverClosed, true);
-  assert.equal(fs.existsSync(result.profile), false);
-  assert.equal(processIsAlive(result.ownedPid), false);
-  assert.equal(await portIsClosed(result.port), true);
   return result;
 }
 
@@ -529,13 +324,9 @@ async function serverTimeoutSelfTest() {
   await assert.rejects(closeServer(inertClose, new Set(), 20), /forced server close timed out.*activeConnections=0/);
 }
 
-const browserPath = browserExecutable();
 const profileRoot = os.tmpdir();
 const recoverySelfTest = leftoverRecoverySelfTest(profileRoot);
 const recoveryAtStartup = recoverOwnedProfiles(profileRoot);
-const profile = fs.mkdtempSync(path.join(profileRoot, "sql-bi-browser-"));
-const ownershipMarker = path.join(profile, PROFILE_MARKER);
-fs.writeFileSync(ownershipMarker, JSON.stringify({ schema: PROFILE_SCHEMA, harness: "browser-query-graph", pid: process.pid, createdAt: new Date().toISOString() }));
 const rawHtml = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 assert.equal(rawHtml.includes("__SQLBI_BROWSER_TEST__"), false, "raw production HTML must not expose browser test hooks");
 const servedHtml = instrumentProductionHtml(rawHtml);
@@ -563,9 +354,10 @@ app.on("connection", socket => {
 });
 
 let browserProcess;
+let browserClient;
 let client;
+let currentAttempt;
 let cleanupPromise;
-let browserStderr = "";
 const suiteContext = { startedAt: suiteStarted, currentPhase: "self-tests", browserPid: null, debugPort: null, currentUrl: "", abortController: new AbortController(), timedOut: false };
 const watchdog = createSuiteWatchdog(TIMEOUTS.suite, suiteContext, () => { suiteContext.timedOut = true; client?.rejectPending(new Error("suite timeout aborted pending CDP requests")); });
 test("suite watchdog uses TIMEOUTS.suite and is active during workflow", () => { assert.equal(TIMEOUTS.suite, 120000); assert.equal(watchdog.isActive(), true); });
@@ -573,6 +365,8 @@ test("stale owned profile recovery removes marked stale profile only", () => { a
 test("startup recovery is restricted to valid owned profile markers", () => assert.ok(Array.isArray(recoveryAtStartup.removed)));
 await cdpLifecycleSelfTest(suiteContext.abortController.signal);
 test("pending CDP requests reject on close, error, and timeout", () => true);
+await launchLayerSelfTests(CdpClient);
+test("browser launch layer self-tests pass", () => true);
 const controlledFailure = await controlledFailureSelfTest();
 test("controlled failure subprocess removes owned process, server, and profile", () => { assert.equal(controlledFailure.profileRemoved, true); assert.equal(controlledFailure.serverClosed, true); });
 await serverTimeoutSelfTest();
@@ -600,29 +394,23 @@ test("resource errors and unhandled rejections are fail-closed with exact allowl
 async function runBrowserWorkflow() {
   suiteContext.currentPhase = "server-start";
   const appPort = await listenServer(app);
-  const debugPort = await availablePort();
   const pageUrl = `http://127.0.0.1:${appPort}/index.html`;
-  suiteContext.debugPort = debugPort;
   suiteContext.currentUrl = pageUrl;
-  suiteContext.currentPhase = "browser-launch";
-  browserProcess = spawn(browserPath, [
-    "--headless=new",
-    "--disable-extensions",
-    "--disable-gpu",
-    "--no-first-run",
-    "--no-default-browser-check",
-    `--remote-debugging-port=${debugPort}`,
-    `--user-data-dir=${profile}`,
-    "--window-size=1920,1080",
-    pageUrl
-  ], { stdio: ["ignore", "ignore", "pipe"] });
-  browserProcess.stderr.on("data", chunk => { browserStderr = `${browserStderr}${chunk}`.slice(-4000); });
+  currentAttempt = await launchBrowserPage({
+    CdpClient,
+    pageUrl,
+    suiteContext,
+    maxAttemptsPerBrowser: 2,
+    onDiagnostic: (diagnostic) => {
+      console.log(`Launch diagnostic: ${JSON.stringify(diagnostic)}`);
+    }
+  });
+  browserProcess = currentAttempt.browserProcess;
+  browserClient = currentAttempt.browserClient;
+  client = currentAttempt.pageClient;
   suiteContext.browserPid = browserProcess.pid;
-  suiteContext.currentPhase = "wait-page-target";
-  const target = await waitForPageTarget(`http://127.0.0.1:${debugPort}/json/list`);
+  suiteContext.debugPort = currentAttempt.debugPort;
   suiteContext.currentPhase = "cdp-open";
-  client = new CdpClient(target.webSocketDebuggerUrl);
-  await client.open();
   await client.command("Page.enable");
   await client.command("Runtime.enable");
   await client.command("Log.enable");
@@ -797,34 +585,18 @@ async function runBrowserWorkflow() {
     }
   }
   if (failed) throw new Error(`${failed} browser query graph tests failed`);
-  console.log(`\n${passed} browser query graph tests passed (${path.basename(browserPath)})`);
+  console.log(`\n${passed} browser query graph tests passed (${path.basename(currentAttempt?.browserPath || "unknown")})`);
 }
 
 async function cleanup() {
   if (cleanupPromise) return cleanupPromise;
   cleanupPromise = (async () => {
   suiteContext.currentPhase = "cleanup";
-  if (client) {
-    try { await client.command("Browser.close", {}, TIMEOUTS.cleanup); } catch {}
-    client.close();
-  }
-  if (browserProcess && browserProcess.exitCode === null) {
-    const exited = new Promise(resolve => browserProcess.once("exit", resolve));
-    try {
-      await withTimeout(exited, TIMEOUTS.cleanup, "browser process cleanup");
-    } catch {
-      if (process.platform === "win32") spawnSync("taskkill.exe", ["/PID", String(browserProcess.pid), "/T", "/F"], { stdio: "ignore" });
-      else browserProcess.kill("SIGKILL");
-      await withTimeout(exited, TIMEOUTS.cleanup, "forced browser process cleanup");
-    }
+  if (currentAttempt) {
+    await cleanupAttempt(currentAttempt, suiteContext);
   }
   await closeServer(app, serverSockets);
-  let profileRemoved = false;
-  for (let attempt = 0; attempt < 10 && !profileRemoved; attempt += 1) {
-    try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); profileRemoved = true; }
-    catch (error) { if (attempt === 9) throw error; await delay(200); }
-  }
-  console.log(`Browser cleanup: CDP=closed, browser=stopped, server=closed, profileRemoved=${!fs.existsSync(profile)}, elapsedMs=${Date.now() - suiteStarted}`);
+  console.log(`Browser cleanup: CDP=closed, browser=stopped, server=closed, elapsedMs=${Date.now() - suiteStarted}`);
   })();
   return cleanupPromise;
 }
@@ -833,7 +605,7 @@ try {
   await Promise.race([runBrowserWorkflow(), watchdog.promise]);
   watchdog.clear();
 } catch (error) {
-  console.error(`Browser workflow failed in phase=${suiteContext.currentPhase}; browserExit=${browserProcess?.exitCode}; stderr=${browserStderr.trim() || "<empty>"}: ${error.stack || error}`);
+  console.error(`Browser workflow failed in phase=${suiteContext.currentPhase}; browserExit=${browserProcess?.exitCode}; lastOutput=${JSON.stringify(currentAttempt?.lastOutput?.(2000))}: ${error.stack || error}`);
   throw error;
 } finally {
   watchdog.clear();
