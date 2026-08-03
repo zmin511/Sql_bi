@@ -4,14 +4,35 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { createProjectSnapshot } from "../src/core/project.js";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const TIMEOUTS = { suite: 120000, launch: 10000, cdp: 10000, navigation: 15000, fixture: 20000, selector: 10000, interaction: 10000, cleanup: 10000 };
+const TIMEOUTS = { suite: 120000, launch: 10000, cdp: 10000, navigation: 15000, fixture: 20000, selector: 10000, interaction: 10000, cleanup: 10000, serverStart: 5000, serverClose: 5000 };
 const suiteStarted = Date.now();
+
+function createSuiteWatchdog(timeout, context, onTimeout = () => {}) {
+  let timer;
+  let settled = false;
+  const promise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      context.abortController.abort();
+      const elapsed = Date.now() - context.startedAt;
+      const error = new Error(`suite timeout after ${elapsed}ms; phase=${context.currentPhase}; browserPid=${context.browserPid ?? "unavailable"}; debugPort=${context.debugPort ?? "unavailable"}; url=${context.currentUrl || "unavailable"}`);
+      try { onTimeout(error); } finally { reject(error); }
+    }, timeout);
+  });
+  return {
+    promise,
+    clear() { if (!settled) { settled = true; clearTimeout(timer); } },
+    isActive() { return !settled; }
+  };
+}
 
 function withTimeout(promise, milliseconds, operation, detail = "") {
   let timer;
@@ -37,10 +58,34 @@ function browserExecutable() {
 
 async function availablePort() {
   const server = net.createServer();
-  await new Promise((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject));
+  await withTimeout(new Promise((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject)), TIMEOUTS.serverStart, "temporary port server startup", "127.0.0.1:0");
   const { port } = server.address();
-  await new Promise(resolve => server.close(resolve));
+  await withTimeout(new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())), TIMEOUTS.serverClose, "temporary port server close", `127.0.0.1:${port}`);
   return port;
+}
+
+async function listenServer(server, host = "127.0.0.1", port = 0, timeout = TIMEOUTS.serverStart) {
+  await withTimeout(new Promise((resolve, reject) => {
+    const onError = error => { server.off("listening", onListening); reject(error); };
+    const onListening = () => { server.off("error", onError); resolve(); };
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(port, host);
+  }), timeout, "server startup", `${host}:${port}`);
+  return server.address().port;
+}
+
+async function closeServer(server, sockets, timeout = TIMEOUTS.serverClose) {
+  if (!server.listening) return;
+  const closing = new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  server.closeIdleConnections?.();
+  try {
+    await withTimeout(closing, timeout, "server close", `activeConnections=${sockets.size}`);
+  } catch (error) {
+    for (const socket of sockets) socket.destroy();
+    await withTimeout(closing, timeout, "forced server close", `activeConnections=${sockets.size}`);
+    if (server.listening) throw error;
+  }
 }
 
 async function waitForJson(url, attempts = 100) {
@@ -79,8 +124,8 @@ async function waitForEvent(client, predicate, operation, timeout = 1000) {
 }
 
 class CdpClient {
-  constructor(url) {
-    this.socket = new WebSocket(url);
+  constructor(url, Socket = WebSocket) {
+    this.socket = new Socket(url);
     this.nextId = 1;
     this.pending = new Map();
     this.events = [];
@@ -136,6 +181,86 @@ class CdpClient {
     this.rejectPending(new Error("CDP client closed by suite cleanup"));
     if (this.socket.readyState < WebSocket.CLOSING) this.socket.close();
   }
+}
+
+class MockWebSocket {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  constructor(url) {
+    this.url = url;
+    this.readyState = MockWebSocket.CONNECTING;
+    this.listeners = new Map();
+    queueMicrotask(() => { this.readyState = MockWebSocket.OPEN; this.emit("open", {}); });
+  }
+  addEventListener(type, listener, options = {}) {
+    const entries = this.listeners.get(type) || [];
+    entries.push({ listener, once: Boolean(options.once) });
+    this.listeners.set(type, entries);
+  }
+  emit(type, event) {
+    const entries = [...(this.listeners.get(type) || [])];
+    this.listeners.set(type, entries.filter(entry => !entry.once));
+    for (const entry of entries) entry.listener(event);
+  }
+  send() {}
+  close() { this.readyState = MockWebSocket.CLOSING; this.emit("close", {}); }
+}
+
+async function cdpLifecycleSelfTest(signal) {
+  const exercise = async (event, expected) => {
+    const client = new CdpClient(`mock://${event}`, MockWebSocket);
+    await client.open();
+    const pending = client.command("Test.pending", {}, event === "timeout" ? 20 : 1000);
+    if (event !== "timeout") client.socket.emit(event, {});
+    await assert.rejects(pending, expected);
+    assert.equal(client.pending.size, 0);
+    client.close();
+    client.close();
+  };
+  if (signal?.aborted) throw new Error("CDP lifecycle self-test aborted");
+  await exercise("close", /CDP WebSocket closed/);
+  await exercise("error", /CDP WebSocket failed/);
+  await exercise("timeout", /timed out after 20ms/);
+}
+
+function semanticCore(snapshot) {
+  const clone = structuredClone(snapshot);
+  const visualization = clone.snapshot?.view?.visualization;
+  if (!visualization || typeof visualization !== "object") throw new Error("Persisted visualization settings missing from semantic snapshot");
+  const keys = Object.keys(visualization).sort();
+  assert.deepEqual(keys, ["graphFilter", "viewMode"], `Unknown persisted visualization fields: ${keys.join(", ")}`);
+  delete clone.snapshot.view.visualization;
+  delete clone.focus;
+  return clone;
+}
+
+function persistedVisualization(snapshot) {
+  return snapshot.snapshot?.view?.visualization;
+}
+
+function classifyDiagnostics(events, unhandledRejections, allowedMarkers = new Set()) {
+  const classified = {
+    exceptions: events.filter(event => event.method === "Runtime.exceptionThrown"),
+    consoleErrors: events.filter(event => event.method === "Runtime.consoleAPICalled" && event.params.type === "error"),
+    resourceErrors: events.filter(event => event.method === "Log.entryAdded" && event.params.entry.level === "error"),
+    warnings: events.filter(event => event.method === "Runtime.consoleAPICalled" && event.params.type === "warning"),
+    unhandledRejections: [...unhandledRejections]
+  };
+  const unexpected = [...classified.exceptions, ...classified.consoleErrors, ...classified.resourceErrors, ...classified.unhandledRejections]
+    .filter(item => ![...allowedMarkers].some(marker => JSON.stringify(item).includes(marker)));
+  return { ...classified, unexpected };
+}
+
+function diagnosticPolicySelfTest() {
+  const resourceMarker = "__EXACT_RESOURCE_PROBE__";
+  const rejectionMarker = "__EXACT_REJECTION_PROBE__";
+  const resource = { method: "Log.entryAdded", params: { entry: { level: "error", url: resourceMarker } } };
+  const rejection = `Error: ${rejectionMarker}`;
+  assert.equal(classifyDiagnostics([resource], []).unexpected.length, 1);
+  assert.equal(classifyDiagnostics([], [rejection]).unexpected.length, 1);
+  assert.equal(classifyDiagnostics([resource], [rejection], new Set([resourceMarker, rejectionMarker])).unexpected.length, 0);
+  assert.equal(classifyDiagnostics([{ ...resource, params: { entry: { level: "error", url: `${resourceMarker}-different` } } }], [], new Set([`${resourceMarker}-exact-only`])).unexpected.length, 1);
 }
 
 function state(rows, selected, queryGraph = { viewMode: "split", graphFilter: "all" }) {
@@ -217,23 +342,33 @@ function largeSnapshot() {
 }
 
 const instrumentationAnchor = "    // init\n    renderTree(); renderSQL();";
-const instrumentation = `    window.__SQLBI_BROWSER_TEST__ = Object.freeze({
+const instrumentation = `    const __sqlbiBrowserUnhandledRejections = [];
+    window.addEventListener("unhandledrejection", event => {
+      __sqlbiBrowserUnhandledRejections.push(String(event.reason && (event.reason.stack || event.reason.message) || event.reason));
+    });
+    window.__SQLBI_BROWSER_TEST__ = Object.freeze({
       semantic: () => {
         let snapshot = null;
         try {
           snapshot = requireCanonicalProjectApi().createProjectSnapshot(state, APP_VERSION);
           delete snapshot.savedAt;
-          if (snapshot.view) delete snapshot.view.visualization;
         } catch {}
         return {
           selectedIds: Object.keys(state.selected).filter(id => state.selected[id]),
           queryPlan: state.queryPlan,
           sql: state.queryResult && state.queryResult.sql || "",
           diagnostics: state.queryResult && state.queryResult.diagnostics || [],
+          focus: state.queryGraphFocus && state.queryGraphFocus.id ? {kind:state.queryGraphFocus.kind,id:state.queryGraphFocus.id} : null,
           snapshot
         };
       },
-      render: () => renderQueryGraph()
+      render: () => renderQueryGraph(),
+      unhandledRejections: () => __sqlbiBrowserUnhandledRejections.slice(),
+      removeUnhandledRejection: marker => {
+        const index=__sqlbiBrowserUnhandledRejections.findIndex(value => value.includes(marker));
+        if(index>=0) __sqlbiBrowserUnhandledRejections.splice(index,1);
+        return index;
+      }
     });
 `;
 
@@ -275,6 +410,28 @@ async function loadProject(client, snapshot) {
   })()`);
 }
 
+async function waitForRenderedProject(client, expected, timeout = TIMEOUTS.fixture) {
+  const expression = `(() => {
+    const api=window.__SQLBI_BROWSER_TEST__;
+    if(!api) return false;
+    const semantic=api.semantic();
+    const nodeText=document.getElementById('queryGraphNodeCount')?.textContent || '';
+    const edgeText=document.getElementById('queryGraphEdgeCount')?.textContent || '';
+    const sql=document.getElementById('sql')?.value || '';
+    const pending=document.querySelector('[data-render-pending="true"],.query-graph-loading');
+    return nodeText===${JSON.stringify(`Узлов: ${expected.nodes}`)} &&
+      (!${Number.isInteger(expected.edges)} || edgeText===${JSON.stringify(`Связей: ${expected.edges}`)}) &&
+      semantic.queryPlan && ['ready','error'].includes(semantic.queryPlan.status) &&
+      sql.length>0 && !pending;
+  })()`;
+  await waitFor(client, expression, true, timeout);
+}
+
+async function loadProjectAndWait(client, snapshot, expected, timeout = TIMEOUTS.fixture) {
+  await loadProject(client, snapshot);
+  await waitForRenderedProject(client, expected, timeout);
+}
+
 async function pointerClick(client, selector) {
   const point = await evaluate(client, `(() => { const element=document.querySelector(${JSON.stringify(selector)}); if(!element) throw new Error("Pointer target missing"); element.scrollIntoView({block:"center",inline:"center"}); const rect=element.getBoundingClientRect(); return {x:rect.left+rect.width/2,y:rect.top+rect.height/2}; })()`);
   await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
@@ -295,10 +452,90 @@ async function pressEscape(client) {
   await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 }
 
+const PROFILE_MARKER = ".sql-bi-browser-harness-owned.json";
+const PROFILE_SCHEMA = 1;
+
+function processIsAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+function recoverOwnedProfiles(root) {
+  const result = { removed: [], retained: [], ignored: [] };
+  fs.mkdirSync(root, { recursive: true });
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith("sql-bi-browser-")) continue;
+    const directory = path.join(root, entry.name);
+    const markerPath = path.join(directory, PROFILE_MARKER);
+    if (!fs.existsSync(markerPath)) { result.ignored.push(directory); continue; }
+    let marker;
+    try { marker = JSON.parse(fs.readFileSync(markerPath, "utf8")); } catch { result.ignored.push(directory); continue; }
+    if (marker.schema !== PROFILE_SCHEMA || marker.harness !== "browser-query-graph") { result.ignored.push(directory); continue; }
+    if (processIsAlive(marker.pid)) { result.retained.push(directory); continue; }
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+    result.removed.push(directory);
+  }
+  return result;
+}
+
+function leftoverRecoverySelfTest(root) {
+  fs.mkdirSync(root, { recursive: true });
+  const owned = fs.mkdtempSync(path.join(root, "sql-bi-browser-stale-test-"));
+  const unowned = fs.mkdtempSync(path.join(root, "sql-bi-browser-unowned-test-"));
+  fs.writeFileSync(path.join(owned, PROFILE_MARKER), JSON.stringify({ schema: PROFILE_SCHEMA, harness: "browser-query-graph", pid: 2147483647 }));
+  const result = recoverOwnedProfiles(root);
+  assert.equal(fs.existsSync(owned), false);
+  assert.equal(fs.existsSync(unowned), true);
+  fs.rmSync(unowned, { recursive: true, force: true });
+  return result;
+}
+
+async function portIsClosed(port) {
+  return new Promise(resolve => {
+    const socket = net.createConnection({ host: "127.0.0.1", port });
+    socket.setTimeout(500);
+    socket.once("connect", () => { socket.destroy(); resolve(false); });
+    socket.once("error", () => resolve(true));
+    socket.once("timeout", () => { socket.destroy(); resolve(true); });
+  });
+}
+
+async function controlledFailureSelfTest() {
+  const childPath = fileURLToPath(new URL("./helpers/browser-harness-controlled-failure.mjs", import.meta.url));
+  const child = spawnSync(process.execPath, [childPath], { encoding: "utf8", timeout: TIMEOUTS.cleanup });
+  assert.equal(child.status, 23, `controlled failure child exit: ${child.status}; stderr=${child.stderr}`);
+  const result = JSON.parse(child.stdout.trim().split(/\r?\n/).at(-1));
+  assert.equal(result.errorMessage, "controlled browser harness failure");
+  assert.equal(result.profileRemoved, true);
+  assert.equal(result.serverClosed, true);
+  assert.equal(fs.existsSync(result.profile), false);
+  assert.equal(processIsAlive(result.ownedPid), false);
+  assert.equal(await portIsClosed(result.port), true);
+  return result;
+}
+
+async function serverTimeoutSelfTest() {
+  const inertStart = {
+    once() { return this; },
+    off() { return this; },
+    listen() {}
+  };
+  await assert.rejects(listenServer(inertStart, "127.0.0.1", 45678, 20), /server startup timed out.*127\.0\.0\.1:45678/);
+  const inertClose = {
+    listening: true,
+    close() {},
+    closeIdleConnections() {}
+  };
+  await assert.rejects(closeServer(inertClose, new Set(), 20), /forced server close timed out.*activeConnections=0/);
+}
+
 const browserPath = browserExecutable();
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), "sql-bi-browser-"));
-const ownershipMarker = path.join(profile, ".sql-bi-browser-harness-owned");
-fs.writeFileSync(ownershipMarker, JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }));
+const profileRoot = os.tmpdir();
+const recoverySelfTest = leftoverRecoverySelfTest(profileRoot);
+const recoveryAtStartup = recoverOwnedProfiles(profileRoot);
+const profile = fs.mkdtempSync(path.join(profileRoot, "sql-bi-browser-"));
+const ownershipMarker = path.join(profile, PROFILE_MARKER);
+fs.writeFileSync(ownershipMarker, JSON.stringify({ schema: PROFILE_SCHEMA, harness: "browser-query-graph", pid: process.pid, createdAt: new Date().toISOString() }));
 const rawHtml = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 assert.equal(rawHtml.includes("__SQLBI_BROWSER_TEST__"), false, "raw production HTML must not expose browser test hooks");
 const servedHtml = instrumentProductionHtml(rawHtml);
@@ -319,14 +556,55 @@ const app = http.createServer((request, response) => {
     response.end("Not found");
   }
 });
+const serverSockets = new Set();
+app.on("connection", socket => {
+  serverSockets.add(socket);
+  socket.once("close", () => serverSockets.delete(socket));
+});
 
 let browserProcess;
 let client;
-try {
-  await new Promise((resolve, reject) => app.listen(0, "127.0.0.1", resolve).once("error", reject));
-  const appPort = app.address().port;
+let cleanupPromise;
+let browserStderr = "";
+const suiteContext = { startedAt: suiteStarted, currentPhase: "self-tests", browserPid: null, debugPort: null, currentUrl: "", abortController: new AbortController(), timedOut: false };
+const watchdog = createSuiteWatchdog(TIMEOUTS.suite, suiteContext, () => { suiteContext.timedOut = true; client?.rejectPending(new Error("suite timeout aborted pending CDP requests")); });
+test("suite watchdog uses TIMEOUTS.suite and is active during workflow", () => { assert.equal(TIMEOUTS.suite, 120000); assert.equal(watchdog.isActive(), true); });
+test("stale owned profile recovery removes marked stale profile only", () => { assert.ok(recoverySelfTest.removed.some(directory => directory.includes("sql-bi-browser-stale-test-"))); assert.ok(recoverySelfTest.ignored.some(directory => directory.includes("sql-bi-browser-unowned-test-"))); });
+test("startup recovery is restricted to valid owned profile markers", () => assert.ok(Array.isArray(recoveryAtStartup.removed)));
+await cdpLifecycleSelfTest(suiteContext.abortController.signal);
+test("pending CDP requests reject on close, error, and timeout", () => true);
+const controlledFailure = await controlledFailureSelfTest();
+test("controlled failure subprocess removes owned process, server, and profile", () => { assert.equal(controlledFailure.profileRemoved, true); assert.equal(controlledFailure.serverClosed, true); });
+await serverTimeoutSelfTest();
+test("server startup and close are bounded by explicit timeouts", () => true);
+diagnosticPolicySelfTest();
+test("resource errors and unhandled rejections are fail-closed with exact allowlist markers", () => true);
+{
+  const probeContext = { startedAt: Date.now(), currentPhase: "watchdog-self-test", browserPid: null, debugPort: 43210, currentUrl: "http://127.0.0.1/probe", abortController: new AbortController() };
+  let cleanupRequested = false;
+  const probe = createSuiteWatchdog(20, probeContext, () => { cleanupRequested = true; });
+  await assert.rejects(probe.promise, error => /suite timeout/.test(error.message) && /phase=watchdog-self-test/.test(error.message) && /debugPort=43210/.test(error.message));
+  assert.equal(probeContext.abortController.signal.aborted, true);
+  assert.equal(cleanupRequested, true);
+  test("suite timeout fails with phase context and initiates cleanup", () => true);
+}
+{
+  const successContext = { startedAt: Date.now(), currentPhase: "success-self-test", browserPid: null, debugPort: null, currentUrl: "", abortController: new AbortController() };
+  const successWatchdog = createSuiteWatchdog(1000, successContext);
+  assert.equal(successWatchdog.isActive(), true);
+  successWatchdog.clear();
+  assert.equal(successWatchdog.isActive(), false);
+  test("suite watchdog clears on success", () => true);
+}
+
+async function runBrowserWorkflow() {
+  suiteContext.currentPhase = "server-start";
+  const appPort = await listenServer(app);
   const debugPort = await availablePort();
   const pageUrl = `http://127.0.0.1:${appPort}/index.html`;
+  suiteContext.debugPort = debugPort;
+  suiteContext.currentUrl = pageUrl;
+  suiteContext.currentPhase = "browser-launch";
   browserProcess = spawn(browserPath, [
     "--headless=new",
     "--disable-extensions",
@@ -337,8 +615,12 @@ try {
     `--user-data-dir=${profile}`,
     "--window-size=1920,1080",
     pageUrl
-  ], { stdio: "ignore" });
+  ], { stdio: ["ignore", "ignore", "pipe"] });
+  browserProcess.stderr.on("data", chunk => { browserStderr = `${browserStderr}${chunk}`.slice(-4000); });
+  suiteContext.browserPid = browserProcess.pid;
+  suiteContext.currentPhase = "wait-page-target";
   const target = await waitForPageTarget(`http://127.0.0.1:${debugPort}/json/list`);
+  suiteContext.currentPhase = "cdp-open";
   client = new CdpClient(target.webSocketDebuggerUrl);
   await client.open();
   await client.command("Page.enable");
@@ -348,6 +630,7 @@ try {
     client.command("Runtime.evaluate", { expression: "new Promise(() => {})", awaitPromise: true }, 50),
     /CDP command Runtime\.evaluate timed out after 50ms/
   );
+  suiteContext.currentPhase = "diagnostic-probes-before-navigation";
   test("timed-out CDP command is removed from pending map", () => assert.equal(client.pending.size, 0));
   let allowedProbeCount = 0;
   await evaluate(client, "console.error('__SQLBI_HARNESS_CONSOLE_ERROR_PROBE__')");
@@ -359,9 +642,17 @@ try {
   test("uncaught exception is observed by the fail-closed browser policy", () => assert.ok(exceptionProbeIndex >= 0));
   if (exceptionProbeIndex >= 0) { client.events.splice(exceptionProbeIndex, 1); allowedProbeCount += 1; }
   await client.command("Page.navigate", { url: pageUrl }, TIMEOUTS.navigation);
+  suiteContext.currentPhase = "page-navigation";
   await waitFor(client, "document.readyState", "complete");
   assert.equal(await evaluate(client, "typeof window.__SQLBI_BROWSER_TEST__"), "object", "instrumented page must expose VM-local hooks");
+  const rejectionMarker = "__SQLBI_HARNESS_UNHANDLED_REJECTION_PROBE__";
+  await evaluate(client, `window.dispatchEvent(new PromiseRejectionEvent("unhandledrejection", {promise:Promise.resolve(), reason:new Error(${JSON.stringify(rejectionMarker)})})); true`);
+  await waitFor(client, `window.__SQLBI_BROWSER_TEST__.unhandledRejections().some(value=>value.includes(${JSON.stringify(rejectionMarker)}))`, true, TIMEOUTS.interaction);
+  const removedRejection = await evaluate(client, `window.__SQLBI_BROWSER_TEST__.removeUnhandledRejection(${JSON.stringify(rejectionMarker)})`);
+  test("unhandled rejection is observed by the fail-closed browser policy", () => assert.ok(removedRejection >= 0));
+  allowedProbeCount += 1;
   const performanceRows = [];
+  suiteContext.currentPhase = "browser-contracts";
   async function characterize(name, action, timeout = TIMEOUTS.interaction) {
     const started = Date.now();
     const inPage = await evaluate(client, "performance.now()");
@@ -377,15 +668,14 @@ try {
   test("Escape before fixture load is safe", () => assert.deepEqual(emptyAfterEscape, emptySemantic));
 
   const small = smallSnapshot();
-  await characterize("small project load + initial render", () => loadProject(client, small), TIMEOUTS.fixture);
-  await waitFor(client, "document.getElementById('queryGraphNodeCount').textContent", "Узлов: 7");
+  await characterize("small project load + initial render", () => loadProjectAndWait(client, small, { nodes: 7 }), TIMEOUTS.fixture);
   const baseline = await evaluate(client, semanticExpression);
   assert.match(baseline.sql, /^SELECT/);
 
   await pointerClick(client, '#queryGraphNodes [data-node-id="row:value"]');
   const nodeFocus = await evaluate(client, `({count:document.querySelectorAll('#queryGraphNodes [data-node-id].focus').length,id:document.querySelector('#queryGraphNodes [data-node-id].focus')?.dataset.nodeId,semantic:${semanticExpression}})`);
   test("final node is clickable once", () => assert.deepEqual({ count: nodeFocus.count, id: nodeFocus.id }, { count: 1, id: "row:value" }));
-  test("node focus preserves semantic state", () => assert.deepEqual(nodeFocus.semantic, baseline));
+  test("node focus preserves semantic state", () => { assert.deepEqual(semanticCore(nodeFocus.semantic), semanticCore(baseline)); assert.deepEqual(persistedVisualization(nodeFocus.semantic), persistedVisualization(baseline)); });
   await evaluate(client, "document.getElementById('sql').focus(); document.getElementById('sql').value");
   await pressEscape(client);
   const nodeFocusAfterEscape = await evaluate(client, "document.querySelectorAll('#queryGraphNodes .focus').length");
@@ -396,7 +686,7 @@ try {
   await pointerClick(client, '#queryGraphNodes [data-edge-id="tree:doc:value"]');
   const edgeFocus = await evaluate(client, `({count:document.querySelectorAll('#queryGraphNodes [data-edge-id].focus').length,id:document.querySelector('#queryGraphNodes [data-edge-id].focus')?.dataset.edgeId,semantic:${semanticExpression}})`);
   test("final edge is clickable once", () => assert.deepEqual({ count: edgeFocus.count, id: edgeFocus.id }, { count: 1, id: "tree:doc:value" }));
-  test("edge focus preserves semantic state", () => assert.deepEqual(edgeFocus.semantic, baseline));
+  test("edge focus preserves semantic state", () => { assert.deepEqual(semanticCore(edgeFocus.semantic), semanticCore(baseline)); assert.deepEqual(persistedVisualization(edgeFocus.semantic), persistedVisualization(baseline)); });
   await pressEscape(client);
   await pressEscape(client);
   const edgeFocusAfterEscape = await evaluate(client, "document.querySelectorAll('#queryGraphNodes .focus').length");
@@ -405,7 +695,7 @@ try {
   for (const filter of ["all", "active", "sql", "errors"]) {
     await select(client, "queryGraphFilter", filter);
     const current = await evaluate(client, semanticExpression);
-    test(`filter ${filter} preserves semantic state`, () => assert.deepEqual(current, baseline));
+    test(`filter ${filter} changes only persisted graphFilter`, () => { assert.deepEqual(semanticCore(current), semanticCore(baseline)); assert.deepEqual(persistedVisualization(current), { viewMode: "split", graphFilter: filter }); });
   }
   await select(client, "queryGraphFilter", "all");
   await click(client, '#queryGraphNodes [data-node-id="row:value"]');
@@ -419,14 +709,14 @@ try {
   for (const mode of ["tree", "graph", "split"]) {
     await select(client, "structureViewMode", mode);
     const current = await evaluate(client, semanticExpression);
-    test(`mode ${mode} preserves semantic state`, () => assert.deepEqual(current, baseline));
+    test(`mode ${mode} changes only persisted viewMode`, () => { assert.deepEqual(semanticCore(current), semanticCore(baseline)); assert.deepEqual(persistedVisualization(current), { viewMode: mode, graphFilter: "all" }); });
   }
   await click(client, '#queryGraphNodes [data-node-id="row:value"]');
   await select(client, "queryGraphFilter", "active");
-  await characterize("small project reload", () => loadProject(client, small), TIMEOUTS.fixture);
+  await characterize("small project reload", () => loadProjectAndWait(client, small, { nodes: 7 }), TIMEOUTS.fixture);
   await waitFor(client, "document.getElementById('queryGraphFilter').value", "all");
   const reloaded = await evaluate(client, `({focus:document.querySelectorAll('#queryGraphNodes .focus').length,semantic:${semanticExpression}})`);
-  test("project reload restores semantics without transient focus", () => { assert.equal(reloaded.focus, 0); assert.deepEqual(reloaded.semantic, baseline); });
+  test("project reload restores persisted controls without transient focus", () => { assert.equal(reloaded.focus, 0); assert.equal(reloaded.semantic.focus, null); assert.deepEqual(reloaded.semantic, baseline); assert.deepEqual(persistedVisualization(reloaded.semantic), { viewMode: "split", graphFilter: "all" }); });
 
   await client.command("Emulation.setDeviceMetricsOverride", { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false });
   const responsive = await evaluate(client, `(() => {
@@ -444,8 +734,7 @@ try {
   await client.command("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
 
   const large = largeSnapshot();
-  await characterize("large project load + initial render", () => loadProject(client, large), TIMEOUTS.fixture);
-  await waitFor(client, "document.getElementById('queryGraphNodeCount').textContent", "Узлов: 721");
+  await characterize("large project load + initial render", () => loadProjectAndWait(client, large, { nodes: 721, edges: 643 }), TIMEOUTS.fixture);
   const largeBaseline = await evaluate(client, semanticExpression);
   const largeCounts = await evaluate(client, `({nodes:document.querySelectorAll('#queryGraphNodes [data-node-id]').length,edges:document.querySelectorAll('#queryGraphNodes [data-edge-id]').length,dom:document.querySelectorAll('*').length,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})`);
   await characterize("filter active", () => select(client, "queryGraphFilter", "active"));
@@ -453,21 +742,23 @@ try {
   await characterize("repeated render", () => evaluate(client, "window.__SQLBI_BROWSER_TEST__.render()"));
   const largeRepeated = await evaluate(client, `({nodes:document.querySelectorAll('#queryGraphNodes [data-node-id]').length,edges:document.querySelectorAll('#queryGraphNodes [data-edge-id]').length,dom:document.querySelectorAll('*').length,semantic:${semanticExpression}})`);
   await characterize("node focus", () => click(client, '#queryGraphNodes [data-node-id="row:field-0-0"]'));
-  const largeFocused = await evaluate(client, `({focus:document.querySelectorAll('#queryGraphNodes [data-node-id].focus').length,semantic:${semanticExpression}})`);
+  const largeFocused = await evaluate(client, `({focus:document.querySelectorAll('#queryGraphNodes [data-node-id].focus').length,id:document.querySelector('#queryGraphNodes [data-node-id].focus')?.dataset.nodeId,dimmed:document.querySelectorAll('#queryGraphNodes .dim').length,details:document.getElementById('queryGraphDetails').textContent,semantic:${semanticExpression}})`);
   await pressEscape(client);
+  const largeNodeAfterEscape = await evaluate(client, `({focus:document.querySelectorAll('#queryGraphNodes .focus').length,dimmed:document.querySelectorAll('#queryGraphNodes .dim').length,details:document.getElementById('queryGraphDetails').textContent,semantic:${semanticExpression}})`);
   const largeEdgeSelector = '#queryGraphNodes [data-edge-id^="join:header_detail:"]';
   await characterize("edge focus", () => click(client, largeEdgeSelector));
-  const largeEdgeFocused = await evaluate(client, `({focus:document.querySelectorAll('#queryGraphNodes [data-edge-id].focus').length,details:document.getElementById('queryGraphDetails').textContent,semantic:${semanticExpression}})`);
+  const largeEdgeFocused = await evaluate(client, `({focus:document.querySelectorAll('#queryGraphNodes [data-edge-id].focus').length,id:document.querySelector('#queryGraphNodes [data-edge-id].focus')?.dataset.edgeId,dimmed:document.querySelectorAll('#queryGraphNodes .dim').length,details:document.getElementById('queryGraphDetails').textContent,semantic:${semanticExpression}})`);
   await pressEscape(client);
+  const largeEdgeAfterEscape = await evaluate(client, `({focus:document.querySelectorAll('#queryGraphNodes .focus').length,dimmed:document.querySelectorAll('#queryGraphNodes .dim').length,details:document.getElementById('queryGraphDetails').textContent,semantic:${semanticExpression}})`);
   for (const mode of ["tree", "graph", "split"]) {
     await characterize(`mode ${mode}`, () => select(client, "structureViewMode", mode));
     const current = await evaluate(client, semanticExpression);
-    test(`large mode ${mode} preserves semantic state`, () => assert.deepEqual(current, largeBaseline));
+    test(`large mode ${mode} changes only persisted viewMode`, () => { assert.deepEqual(semanticCore(current), semanticCore(largeBaseline)); assert.deepEqual(persistedVisualization(current), { viewMode: mode, graphFilter: "all" }); });
   }
   for (const filter of ["all", "active", "sql", "errors"]) {
     await characterize(`large filter ${filter}`, () => select(client, "queryGraphFilter", filter));
     const current = await evaluate(client, semanticExpression);
-    test(`large filter ${filter} preserves semantic state`, () => assert.deepEqual(current, largeBaseline));
+    test(`large filter ${filter} changes only persisted graphFilter`, () => { assert.deepEqual(semanticCore(current), semanticCore(largeBaseline)); assert.deepEqual(persistedVisualization(current), { viewMode: "split", graphFilter: filter }); });
   }
   await select(client, "queryGraphFilter", "all");
   const finalLargeCounts = await evaluate(client, `({nodes:document.querySelectorAll('#queryGraphNodes [data-node-id]').length,edges:document.querySelectorAll('#queryGraphNodes [data-edge-id]').length,dom:document.querySelectorAll('*').length,duplicates:Array.from(document.querySelectorAll('[id]')).length-new Set(Array.from(document.querySelectorAll('[id]')).map(element=>element.id)).size})`);
@@ -479,21 +770,19 @@ try {
     assert.ok(joins.some(join => join.kind === "reference" && join.status === "sql"));
   });
   test("large graph repeated render does not multiply DOM", () => assert.deepEqual({ nodes: largeRepeated.nodes, edges: largeRepeated.edges, dom: largeRepeated.dom }, { nodes: largeCounts.nodes, edges: largeCounts.edges, dom: largeCounts.dom }));
-  test("large graph retains click interaction and semantics", () => { assert.equal(largeFocused.focus, 1); assert.deepEqual(largeFocused.semantic, largeBaseline); });
-  test("large graph edge focus and details preserve semantics", () => { assert.equal(largeEdgeFocused.focus, 1); assert.ok(largeEdgeFocused.details.length > 0); assert.deepEqual(largeEdgeFocused.semantic, largeBaseline); });
+  test("large node focus has exact ID, details, and dimming", () => { assert.equal(largeFocused.focus, 1); assert.equal(largeFocused.id, "row:field-0-0"); assert.ok(largeFocused.dimmed > 0); assert.match(largeFocused.details, /_Fld100000/); assert.doesNotMatch(largeFocused.details, /_Document100_IDRRef/); assert.deepEqual(semanticCore(largeFocused.semantic), semanticCore(largeBaseline)); assert.deepEqual(persistedVisualization(largeFocused.semantic), persistedVisualization(largeBaseline)); });
+  test("large node Escape resets focus, details, and dimming without semantic changes", () => { assert.deepEqual({focus:largeNodeAfterEscape.focus,dimmed:largeNodeAfterEscape.dimmed,details:largeNodeAfterEscape.details}, {focus:0,dimmed:0,details:""}); assert.equal(largeNodeAfterEscape.semantic.focus, null); assert.deepEqual(largeNodeAfterEscape.semantic, largeBaseline); });
+  test("large edge focus has exact model identity, details, and dimming", () => { const headerJoin=largeBaseline.queryPlan.joins.find(join=>join.kind==="header_detail"); assert.equal(largeEdgeFocused.focus, 1); assert.match(largeEdgeFocused.id, /^join:header_detail:/); assert.ok(largeEdgeFocused.id.includes(headerJoin.id)); assert.ok(largeEdgeFocused.dimmed > 0); assert.match(largeEdgeFocused.details, /header_detail/); assert.match(largeEdgeFocused.details, /SQL/); assert.deepEqual(semanticCore(largeEdgeFocused.semantic), semanticCore(largeBaseline)); assert.deepEqual(persistedVisualization(largeEdgeFocused.semantic), persistedVisualization(largeBaseline)); });
+  test("large edge Escape resets focus, details, and dimming without semantic changes", () => { assert.deepEqual({focus:largeEdgeAfterEscape.focus,dimmed:largeEdgeAfterEscape.dimmed,details:largeEdgeAfterEscape.details}, {focus:0,dimmed:0,details:""}); assert.equal(largeEdgeAfterEscape.semantic.focus, null); assert.deepEqual(largeEdgeAfterEscape.semantic, largeBaseline); });
   test("large graph final identical state has stable DOM", () => assert.deepEqual(finalLargeCounts, { nodes: largeCounts.nodes, edges: largeCounts.edges, dom: largeCounts.dom, duplicates: 0 }));
   test("large graph has no global horizontal overflow", () => assert.equal(largeCounts.overflow, false));
   console.log("Browser performance characterization (in-page elapsed includes production event/render; round-trip includes CDP):");
   console.table(performanceRows);
-  const exceptions = client.events.filter(event => event.method === "Runtime.exceptionThrown");
-  const consoleEvents = client.events.filter(event => event.method === "Runtime.consoleAPICalled");
-  const consoleErrors = consoleEvents.filter(event => event.params.type === "error");
-  const consoleWarnings = consoleEvents.filter(event => event.params.type === "warning");
-  const logErrors = client.events.filter(event => event.method === "Log.entryAdded" && event.params.entry.level === "error");
+  const unhandledRejections = await evaluate(client, "window.__SQLBI_BROWSER_TEST__.unhandledRejections()");
   const allowed = Array.from({ length: allowedProbeCount }, () => "explicit harness policy probe");
-  const unexpected = [...exceptions, ...consoleErrors];
-  test("tested browser flows have no uncaught exceptions or console errors", () => assert.equal(unexpected.length, 0));
-  console.log(`Browser diagnostics: consoleErrors=${consoleErrors.length}, resourceLogErrors=${logErrors.length}, warnings=${consoleWarnings.length}, allowed=${allowed.length}, unexpected=${unexpected.length}`);
+  const diagnostics = classifyDiagnostics(client.events, unhandledRejections);
+  test("tested browser flows have no unexpected fail-closed diagnostics", () => assert.equal(diagnostics.unexpected.length, 0));
+  console.log(`Browser diagnostics: exceptions=${diagnostics.exceptions.length}, consoleErrors=${diagnostics.consoleErrors.length}, resourceLogErrors=${diagnostics.resourceErrors.length}, unhandledRejections=${diagnostics.unhandledRejections.length}, warnings=${diagnostics.warnings.length}, allowed=${allowed.length}, unexpected=${diagnostics.unexpected.length}`);
 
   let passed = 0;
   let failed = 0;
@@ -509,7 +798,12 @@ try {
   }
   if (failed) throw new Error(`${failed} browser query graph tests failed`);
   console.log(`\n${passed} browser query graph tests passed (${path.basename(browserPath)})`);
-} finally {
+}
+
+async function cleanup() {
+  if (cleanupPromise) return cleanupPromise;
+  cleanupPromise = (async () => {
+  suiteContext.currentPhase = "cleanup";
   if (client) {
     try { await client.command("Browser.close", {}, TIMEOUTS.cleanup); } catch {}
     client.close();
@@ -524,12 +818,24 @@ try {
       await withTimeout(exited, TIMEOUTS.cleanup, "forced browser process cleanup");
     }
   }
-  app.closeAllConnections?.();
-  await new Promise(resolve => app.close(resolve));
+  await closeServer(app, serverSockets);
   let profileRemoved = false;
   for (let attempt = 0; attempt < 10 && !profileRemoved; attempt += 1) {
     try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); profileRemoved = true; }
     catch (error) { if (attempt === 9) throw error; await delay(200); }
   }
   console.log(`Browser cleanup: CDP=closed, browser=stopped, server=closed, profileRemoved=${!fs.existsSync(profile)}, elapsedMs=${Date.now() - suiteStarted}`);
+  })();
+  return cleanupPromise;
+}
+
+try {
+  await Promise.race([runBrowserWorkflow(), watchdog.promise]);
+  watchdog.clear();
+} catch (error) {
+  console.error(`Browser workflow failed in phase=${suiteContext.currentPhase}; browserExit=${browserProcess?.exitCode}; stderr=${browserStderr.trim() || "<empty>"}: ${error.stack || error}`);
+  throw error;
+} finally {
+  watchdog.clear();
+  await cleanup();
 }
