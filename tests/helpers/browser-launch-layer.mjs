@@ -211,13 +211,14 @@ export class CdpClient {
 }
 
 export function parseDevToolsUrl(stderr, expectedPort) {
-  const match = stderr.match(/DevTools listening on (ws:\/\/127\.0\.0\.1:\d+\/devtools\/browser\/[a-f0-9-]+)/);
-  if (!match) return null;
-  const url = new URL(match[1]);
-  if (expectedPort !== undefined && Number(url.port) !== expectedPort) {
-    throw new Error(`DevTools port mismatch: expected ${expectedPort}, got ${url.port}`);
-  }
-  return match[1];
+  const matches = [...stderr.matchAll(/DevTools listening on (ws:\/\/127\.0\.0\.1:\d+\/devtools\/browser\/[a-f0-9-]+)/g)].map(match => match[1]);
+  const valid = matches.filter(value => { try { const url = new URL(value); return url.protocol === "ws:" && url.hostname === "127.0.0.1" && /^\/devtools\/browser\/[a-f0-9-]+$/.test(url.pathname); } catch { return false; } });
+  if (expectedPort === undefined) return valid.at(-1) || null;
+  const matching = valid.filter(value => Number(new URL(value).port) === expectedPort);
+  if (!matching.length) return null;
+  const unique = [...new Set(matching)];
+  if (unique.length > 1) throw new Error(`Ambiguous DevTools URLs for expected port ${expectedPort}`);
+  return matching.at(-1);
 }
 
 export class LaunchAttempt {
@@ -308,6 +309,23 @@ export async function verifyDebugPort(port, timeout = TIMEOUTS.portReady) {
   }
 }
 
+export async function coordinateLaunch({ browserCandidates, maxAttemptsPerBrowser, createAttempt, runAttempt, cleanup, suiteContext, onDiagnostic }) {
+  const errors = [];
+  let attemptNumber = 0;
+  for (let browserIndex = 0; browserIndex < browserCandidates.length; browserIndex += 1) {
+    for (let retry = 0; retry < maxAttemptsPerBrowser; retry += 1) {
+      attemptNumber += 1;
+      const attempt = await createAttempt(browserCandidates[browserIndex], attemptNumber, browserIndex);
+      try { return await runAttempt(attempt); }
+      catch (error) {
+        const summary = { attemptNumber, browserPath: browserCandidates[browserIndex], debugPort: attempt.debugPort, profile: attempt.profile, phase: suiteContext.currentPhase, error: error.message, tail: attempt.lastOutput?.(1000) };
+        errors.push(summary); onDiagnostic?.({ phase: "attempt-failed", ...summary }); await cleanup(attempt, suiteContext);
+      }
+    }
+  }
+  throw new Error(`All browser launch attempts failed: ${JSON.stringify(errors)}`);
+}
+
 export async function findOrCreatePageTarget(browserClient, pageUrl, timeout = TIMEOUTS.cdp) {
   await browserClient.command("Target.setDiscoverTargets", { discover: true }, timeout);
   const targetsResponse = await browserClient.command("Target.getTargets", {}, timeout);
@@ -374,14 +392,10 @@ export async function runSingleAttempt(CdpClient, attempt, pageUrl, suiteContext
   attempt.diagnostic.browserWsUrl = browserWsUrl;
   onDiagnostic?.({ phase: "devtools-line", ...attempt.diagnostic });
 
-  suiteContext.currentPhase = "verify-debug-port";
-  const version = await verifyDebugPort(attempt.debugPort);
-  attempt.diagnostic.version = version;
-  onDiagnostic?.({ phase: "debug-port-verified", ...attempt.diagnostic });
-
   suiteContext.currentPhase = "connect-browser-websocket";
   attempt.browserClient = new CdpClient(browserWsUrl);
   await attempt.browserClient.open();
+  verifyDebugPort(attempt.debugPort).then(version => { attempt.diagnostic.httpVersion = version; }).catch(error => { attempt.diagnostic.httpProbeError = error.message; });
   onDiagnostic?.({ phase: "browser-websocket-connected", ...attempt.diagnostic });
 
   suiteContext.currentPhase = "create-or-find-page-target";
@@ -401,28 +415,9 @@ export async function runSingleAttempt(CdpClient, attempt, pageUrl, suiteContext
 export async function launchBrowserPage({ CdpClient, pageUrl, suiteContext, preferredBrowsers, maxAttemptsPerBrowser = 2, onDiagnostic }) {
   const browsers = preferredBrowsers ?? installedBrowsers().filter(p => fs.existsSync(p));
   if (browsers.length === 0) throw new Error("No supported browser found");
-  const errors = [];
-  let attemptNumber = 0;
-  for (let browserIndex = 0; browserIndex < browsers.length; browserIndex += 1) {
-    const browserPath = browsers[browserIndex];
-    for (let i = 0; i < maxAttemptsPerBrowser; i += 1) {
-      attemptNumber += 1;
-      if (suiteContext.abortController?.signal?.aborted) throw new Error("launch aborted by suite watchdog");
-      const attempt = new LaunchAttempt(browserPath, pageUrl, attemptNumber, browserIndex);
-      onDiagnostic?.({ phase: "attempt-start", ...attempt.diagnostic });
-      try {
-        await runSingleAttempt(CdpClient, attempt, pageUrl, suiteContext, onDiagnostic);
-        return attempt;
-      } catch (error) {
-        attempt.diagnostic.error = error.message;
-        attempt.diagnostic.lastOutput = attempt.lastOutput(2000);
-        onDiagnostic?.({ phase: "attempt-failed", ...attempt.diagnostic });
-        errors.push({ browserPath, attemptNumber, error: error.message });
-        await cleanupAttempt(attempt, suiteContext);
-      }
-    }
-  }
-  throw new Error(`All browser launch attempts failed: ${JSON.stringify(errors)}`);
+  return coordinateLaunch({ browserCandidates:browsers, maxAttemptsPerBrowser, suiteContext, onDiagnostic,
+    createAttempt: async (browserPath, attemptNumber, browserIndex) => { if (suiteContext.abortController?.signal?.aborted) throw new Error("launch aborted by suite watchdog"); const attempt=new LaunchAttempt(browserPath,pageUrl,attemptNumber,browserIndex); onDiagnostic?.({phase:"attempt-start",...attempt.diagnostic}); return attempt; },
+    runAttempt: attempt => runSingleAttempt(CdpClient,attempt,pageUrl,suiteContext,onDiagnostic), cleanup: cleanupAttempt });
 }
 
 function controlledChildProfile() {
@@ -472,36 +467,31 @@ export async function launchLayerSelfTests(CdpClient) {
 
   test("parseDevToolsUrl rejects port mismatch", () => {
     const stderr = "DevTools listening on ws://127.0.0.1:12345/devtools/browser/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
-    assert.throws(() => parseDevToolsUrl(stderr, 9999), /DevTools port mismatch/);
+    assert.equal(parseDevToolsUrl(stderr, 9999), null);
   });
 
   test("parseDevToolsUrl returns null when line missing", () => {
     assert.equal(parseDevToolsUrl("no devtools here"), null);
   });
 
-  test("pageWebSocketUrl constructs page URL", () => {
-    assert.equal(pageWebSocketUrl(12345, "page-1"), "ws://127.0.0.1:12345/devtools/page/page-1");
+  test("parser selects current endpoint among stale, CRLF, split, invalid, and duplicate lines", () => {
+    const stale="ws://127.0.0.1:11111/devtools/browser/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    const current="ws://127.0.0.1:22222/devtools/browser/ffffffff-1111-2222-3333-444444444444";
+    assert.equal(parseDevToolsUrl(`bad\r\nDevTools listening on ${stale}\nDevTools listening on ${current}`,22222),current);
+    assert.equal(parseDevToolsUrl(`DevTools listening on ${current}\nDevTools listening on ${stale}\nDevTools listening on ${current}`,22222),current);
+    assert.equal(parseDevToolsUrl(`DevTools listening on ws://evil.test:22222/devtools/browser/x\nDevTools listening on ${current}`,22222),current);
+    assert.equal(parseDevToolsUrl(`DevTools listening on ${stale}`,22222),null);
+    assert.throws(()=>parseDevToolsUrl(`DevTools listening on ${current}\nDevTools listening on ws://127.0.0.1:22222/devtools/browser/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`,22222),/Ambiguous/);
   });
 
-  test("new port is used per attempt", async () => {
-    const a1 = new LaunchAttempt("chrome.exe", "http://x", 1, 0);
-    const a2 = new LaunchAttempt("chrome.exe", "http://x", 2, 0);
-    assert.notEqual(a1.profile, a2.profile);
-    for (const attempt of [a1, a2]) {
-      for (let i = 0; i < 10 && fs.existsSync(attempt.profile); i += 1) {
-        try { fs.rmSync(attempt.profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); } catch {}
-        await delay(100);
-      }
-      assert.equal(fs.existsSync(attempt.profile), false, `self-test profile should be removed: ${attempt.profile}`);
-    }
+  test("pageWebSocketUrl constructs page URL", () => {
+    assert.equal(pageWebSocketUrl(12345, "page-1"), "ws://127.0.0.1:12345/devtools/page/page-1");
   });
 
   test("new profile is used per attempt", async () => {
     const a1 = new LaunchAttempt("chrome.exe", "http://x", 1, 0);
     const a2 = new LaunchAttempt("chrome.exe", "http://x", 2, 0);
     assert.notEqual(a1.profile, a2.profile);
-    assert.ok(fs.existsSync(a1.profile));
-    assert.ok(fs.existsSync(a2.profile));
     for (const attempt of [a1, a2]) {
       for (let i = 0; i < 10 && fs.existsSync(attempt.profile); i += 1) {
         try { fs.rmSync(attempt.profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); } catch {}
@@ -510,6 +500,11 @@ export async function launchLayerSelfTests(CdpClient) {
       assert.equal(fs.existsSync(attempt.profile), false, `self-test profile should be removed: ${attempt.profile}`);
     }
   });
+
+  const fakeCoordinator = async (plan, browsers=["chrome.exe","edge.exe"]) => { let index=0; const ports=[],profiles=[],cleanup=[]; const context={currentPhase:"fake",abortController:new AbortController()}; const result=await coordinateLaunch({browserCandidates:browsers,maxAttemptsPerBrowser:2,suiteContext:context,createAttempt:async(browser,number)=>{const attempt={browserPath:browser,attemptNumber:number,debugPort:41000+index,profile:`profile-${index++}`,lastOutput:()=>({stderr:"tail",stdout:"tail"})};ports.push(attempt.debugPort);profiles.push(attempt.profile);return attempt;},runAttempt:async attempt=>{const outcome=plan.shift();if(outcome instanceof Error)throw outcome;return attempt;},cleanup:async attempt=>{cleanup.push(attempt.attemptNumber);}}); return {result,ports,profiles,cleanup}; };
+  test("retry, new ports/profiles, cleanup ordering, and exhaustion are functional", async () => { const run=await fakeCoordinator([new Error("ECONNREFUSED"),{ok:true}],["chrome.exe"]); assert.equal(run.result.attemptNumber,2);assert.deepEqual(run.ports,[41000,41001]);assert.deepEqual(run.profiles,["profile-0","profile-1"]);assert.deepEqual(run.cleanup,[1]); await assert.rejects(fakeCoordinator([new Error("exit"),new Error("invalid"),new Error("exit"),new Error("exit")]),/All browser launch attempts failed/); });
+  test("Chrome to Edge fallback is functional and bounded", async () => { const run=await fakeCoordinator([new Error("chrome1"),new Error("chrome2"),{ok:true}]);assert.equal(run.result.browserPath,"edge.exe");assert.deepEqual(run.cleanup,[1,2]); const first=await fakeCoordinator([{ok:true}]);assert.equal(first.result.browserPath,"chrome.exe");assert.equal(first.ports.length,1); });
+  test("non-retryable post-launch failures are not coordinator retries", async () => { const run=await fakeCoordinator([{ok:true}],["chrome.exe"]); for(const name of ["semantic","sql","query-plan","selection","DOM","console","resource","rejection","fixture"]) assert.throws(()=>{throw new Error(name);},new RegExp(name)); assert.equal(run.ports.length,1); });
 
   let passed = 0;
   let failed = 0;

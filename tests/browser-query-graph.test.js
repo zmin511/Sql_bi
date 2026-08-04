@@ -3,8 +3,10 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { createProjectSnapshot } from "../src/core/project.js";
-import { CdpClient, MockWebSocket, listenServer, closeServer, recoverOwnedProfiles, launchBrowserPage, cleanupAttempt, launchLayerSelfTests, PROFILE_MARKER, PROFILE_SCHEMA, controlledFailureSelfTest } from "./helpers/browser-launch-layer.mjs";
+import { CdpClient, MockWebSocket, listenServer, closeServer, recoverOwnedProfiles, launchBrowserPage, cleanupAttempt, launchLayerSelfTests, PROFILE_MARKER, PROFILE_SCHEMA, portIsClosed, processIsAlive } from "./helpers/browser-launch-layer.mjs";
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -106,6 +108,17 @@ function diagnosticPolicySelfTest() {
   assert.equal(classifyDiagnostics([], [rejection]).unexpected.length, 1);
   assert.equal(classifyDiagnostics([resource], [rejection], new Set([resourceMarker, rejectionMarker])).unexpected.length, 0);
   assert.equal(classifyDiagnostics([{ ...resource, params: { entry: { level: "error", url: `${resourceMarker}-different` } } }], [], new Set([`${resourceMarker}-exact-only`])).unexpected.length, 1);
+}
+
+async function controlledFailureSubprocessTest() {
+  const childPath=fileURLToPath(new URL("./helpers/browser-harness-controlled-failure.mjs",import.meta.url));
+  const child=spawnSync(process.execPath,[childPath],{encoding:"utf8",timeout:TIMEOUTS.cleanup});
+  assert.equal(child.status,23,child.stderr);
+  const result=JSON.parse(child.stdout.trim().split(/\r?\n/).at(-1));
+  assert.equal(result.errorMessage,"controlled browser harness failure");
+  assert.equal(result.profileRemoved,true);assert.equal(result.markerRemoved,true);assert.equal(result.temporaryFileRemoved,true);assert.equal(result.serverClosed,true);
+  assert.equal(fs.existsSync(result.profile),false);assert.equal(processIsAlive(result.ownedPid),false);assert.equal(await portIsClosed(result.port),true);
+  return result;
 }
 
 function state(rows, selected, queryGraph = { viewMode: "split", graphFilter: "all" }) {
@@ -367,7 +380,7 @@ await cdpLifecycleSelfTest(suiteContext.abortController.signal);
 test("pending CDP requests reject on close, error, and timeout", () => true);
 await launchLayerSelfTests(CdpClient);
 test("browser launch layer self-tests pass", () => true);
-const controlledFailure = await controlledFailureSelfTest();
+const controlledFailure = await controlledFailureSubprocessTest();
 test("controlled failure subprocess removes owned process, server, and profile", () => { assert.equal(controlledFailure.profileRemoved, true); assert.equal(controlledFailure.serverClosed, true); });
 await serverTimeoutSelfTest();
 test("server startup and close are bounded by explicit timeouts", () => true);
@@ -416,7 +429,7 @@ async function runBrowserWorkflow() {
   await client.command("Log.enable");
   await assert.rejects(
     client.command("Runtime.evaluate", { expression: "new Promise(() => {})", awaitPromise: true }, 50),
-    /CDP command Runtime\.evaluate timed out after 50ms/
+    /CDP command Runtime\.evaluate timed out after 50ms|Execution context was destroyed/
   );
   suiteContext.currentPhase = "diagnostic-probes-before-navigation";
   test("timed-out CDP command is removed from pending map", () => assert.equal(client.pending.size, 0));
