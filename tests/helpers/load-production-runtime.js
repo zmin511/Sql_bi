@@ -169,12 +169,16 @@ function createBrowserSandbox() {
   return { sandbox, elements };
 }
 
-function applicationScriptFromHtml(html) {
-  const scripts = Array.from(
+function scriptsFromHtml(html) {
+  return Array.from(
     html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi),
     match => match[1]
   );
 
+}
+
+function applicationScriptFromHtml(html) {
+  const scripts = scriptsFromHtml(html);
   if (scripts.length < 2) {
     throw new Error("В index.html не найдены встроенные SheetJS и application script.");
   }
@@ -194,13 +198,16 @@ export function loadProductionRuntime(options = "index.html") {
   const config = typeof options === "string" ? { indexPath: options, instrument: true } : { indexPath: "index.html", instrument: true, ...options };
   const indexPath = config.indexPath;
   const html = fs.readFileSync(indexPath, "utf8");
+  const scripts = scriptsFromHtml(html);
   let source = applicationScriptFromHtml(html);
   const canonicalSource = (html.match(/<!-- BEGIN GENERATED CANONICAL CORE -->\s*[\s\S]*?SQLBI_CANONICAL_MANIFEST [^\n]*\n([\s\S]*?)<!-- END GENERATED CANONICAL CORE -->/) || [])[1] || "";
 
   if (config.instrument) source = instrumentApplicationSource(source);
   const { sandbox: runtimeSandbox, elements: runtimeElements } = createBrowserSandbox();
   if (canonicalSource) vm.runInNewContext(canonicalSource, runtimeSandbox, { filename: indexPath, timeout: 5000 });
+  if (config.includeEmbeddedSheetJs) vm.runInNewContext(scripts[0], runtimeSandbox, { filename: `${indexPath}:sheetjs`, timeout: 5000 });
   vm.runInNewContext(source, runtimeSandbox, { filename: indexPath, timeout: 5000 });
+  if (config.includeEmbeddedSheetJs && !runtimeSandbox.XLSX) throw new Error("Embedded SheetJS did not publish XLSX.");
   if (config.instrument && !runtimeSandbox.__SQLBI_TEST__) throw new Error("Инструментированный production runtime не опубликовал VM-only hooks.");
   if (!config.instrument && runtimeSandbox.__SQLBI_TEST__) throw new Error("Неинструментированный production runtime опубликовал test API.");
   return { api: runtimeSandbox.__SQLBI_TEST__ || null, elements: runtimeElements, html, source, canonicalCore: runtimeSandbox.SQLBICanonicalCore || null, runtime: runtimeSandbox };
