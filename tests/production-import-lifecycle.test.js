@@ -30,8 +30,12 @@ assert.equal(input.value, "", "The structure input must be reset after a failed 
 assert.deepEqual(snapshot(), before, "A failed read must preserve the existing production state.");
 
 const rows = [{ id: "A", object: "Table A", internal: "_Document901", parentId: null }, { id: "AF", object: "Field A", internal: "_Fld901", type: "string", parentId: "A" }];
-const ws = runtime.runtime.XLSX.utils.aoa_to_sheet([["Объекты", "Внутреннее имя", "Тип", "Уровень"], ["Table A", "_Document901", "", 1], ["Field A", "_Fld901", "string", 2]]);
+const structureA = { worksheet: "TDSheet", headers: ["Объекты", "Внутреннее имя", "Тип", "Уровень"], rows: [["Table A", "_Document901", "", 1], ["Field A", "_Fld901", "string", 2]], tableId: "_Document901", fieldId: "_Fld901" };
+const ws = runtime.runtime.XLSX.utils.aoa_to_sheet([structureA.headers, ...structureA.rows]);
 const wb = runtime.runtime.XLSX.utils.book_new(); runtime.runtime.XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
-input.value = "valid.xlsx"; input.files = [{ name: "valid.xlsx", arrayBuffer: () => Promise.resolve(runtime.runtime.XLSX.write(wb, { type: "array", bookType: "xlsx" })) }];
+const xlsxBuffer = runtime.runtime.XLSX.write(wb, { type: "array", bookType: "xlsx" });
+assert.ok(xlsxBuffer.byteLength > 0, "XLSX fixture must have bytes.");
+const fileA = { name: "structure-a.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(xlsxBuffer); } };
+input.value = fileA.name; input.files = [fileA];
 await assert.doesNotReject(() => input.onchange({ target: input }));
-assert.equal(input.value, ""); assert.ok(runtime.api.state.rows.some(row => row.internal === "_Document901"));
+assert.equal(fileA.readCount, 1); assert.equal(input.value, ""); assert.ok(runtime.api.state.rows.some(row => row.internal === structureA.tableId)); assert.ok(runtime.api.state.rows.some(row => row.internal === structureA.fieldId));
