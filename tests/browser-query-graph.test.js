@@ -414,6 +414,11 @@ async function runBrowserWorkflow() {
     pageUrl,
     suiteContext,
     maxAttemptsPerBrowser: 2,
+    operations: {
+      stabilizationOptions: {
+        healthExpression: "Boolean(document.getElementById('tree') && document.getElementById('queryGraphPanel') && window.__SQLBI_BROWSER_TEST__)"
+      }
+    },
     onDiagnostic: (diagnostic) => {
       console.log(`Launch diagnostic: ${JSON.stringify(diagnostic)}`);
     }
@@ -423,15 +428,12 @@ async function runBrowserWorkflow() {
   client = currentAttempt.pageClient;
   suiteContext.browserPid = browserProcess.pid;
   suiteContext.debugPort = currentAttempt.debugPort;
-  suiteContext.currentPhase = "cdp-open";
-  await client.command("Page.enable");
-  await client.command("Runtime.enable");
-  await client.command("Log.enable");
+  suiteContext.currentPhase = "stabilized-runtime";
   await assert.rejects(
     client.command("Runtime.evaluate", { expression: "new Promise(() => {})", awaitPromise: true }, 50),
-    /CDP command Runtime\.evaluate timed out after 50ms|Execution context was destroyed/
+    /CDP command Runtime\.evaluate timed out after 50ms/
   );
-  suiteContext.currentPhase = "diagnostic-probes-before-navigation";
+  suiteContext.currentPhase = "diagnostic-probes-after-stabilization";
   test("timed-out CDP command is removed from pending map", () => assert.equal(client.pending.size, 0));
   let allowedProbeCount = 0;
   await evaluate(client, "console.error('__SQLBI_HARNESS_CONSOLE_ERROR_PROBE__')");
@@ -442,9 +444,7 @@ async function runBrowserWorkflow() {
   const exceptionProbeIndex = await waitForEvent(client, event => event.method === "Runtime.exceptionThrown" && JSON.stringify(event.params).includes("__SQLBI_HARNESS_EXCEPTION_PROBE__"), "uncaught exception policy probe");
   test("uncaught exception is observed by the fail-closed browser policy", () => assert.ok(exceptionProbeIndex >= 0));
   if (exceptionProbeIndex >= 0) { client.events.splice(exceptionProbeIndex, 1); allowedProbeCount += 1; }
-  await client.command("Page.navigate", { url: pageUrl }, TIMEOUTS.navigation);
-  suiteContext.currentPhase = "page-navigation";
-  await waitFor(client, "document.readyState", "complete");
+  suiteContext.currentPhase = "stabilized-page-contract";
   assert.equal(await evaluate(client, "typeof window.__SQLBI_BROWSER_TEST__"), "object", "instrumented page must expose VM-local hooks");
   const rejectionMarker = "__SQLBI_HARNESS_UNHANDLED_REJECTION_PROBE__";
   await evaluate(client, `window.dispatchEvent(new PromiseRejectionEvent("unhandledrejection", {promise:Promise.resolve(), reason:new Error(${JSON.stringify(rejectionMarker)})})); true`);
