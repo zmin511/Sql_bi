@@ -31,6 +31,7 @@ try {
   suiteContext.browserPid = attempt.browserProcess.pid;
   suiteContext.debugPort = attempt.debugPort;
   suiteContext.currentPhase = "read-rejection";
+  const before = await evaluate(`({sql:document.getElementById("sql").value,inputValue:document.getElementById("xlsx").value})`);
 
   await evaluate(`(() => {
     const input=document.getElementById("xlsx");
@@ -42,6 +43,7 @@ try {
 
   const result = await evaluate(`({rejections:window.__local13bRejections.slice(),sql:document.getElementById("sql").value,inputValue:document.getElementById("xlsx").value})`);
   assert.deepEqual(result.rejections, [], "Production structure import must not cause an unhandled rejection in a real browser.");
+  assert.deepEqual({ sql: result.sql, inputValue: result.inputValue }, before, "A failed read must preserve the rendered state and reset the structure input.");
 } finally {
   if (attempt) await cleanupAttempt(attempt, suiteContext);
   await closeServer(server, sockets);

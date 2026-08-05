@@ -14,11 +14,15 @@ const rejectedFile = {
   name: "selected-structure.xlsx",
   arrayBuffer() { return Promise.reject(new Error(marker)); }
 };
+input.files = [rejectedFile];
+const snapshot = () => JSON.parse(JSON.stringify(runtime.api.state));
+const before = snapshot();
 
 await assert.doesNotReject(
-  () => input.onchange({ target: { files: [rejectedFile], value: input.value } }),
+  () => input.onchange({ target: input }),
   "A File.arrayBuffer() failure must use the controlled import-error path."
 );
 
 assert.equal(alerts, 1, "The controlled import-error alert must be shown exactly once.");
 assert.equal(input.value, "", "The structure input must be reset after a failed attempt.");
+assert.deepEqual(snapshot(), before, "A failed read must preserve the existing production state.");
