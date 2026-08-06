@@ -156,3 +156,65 @@ assert.equal(failureScenarioAttempts - attemptsBeforeFailedRead, 1, "The failed 
 assert.equal(failureScenarioAttempts, 2, "The failure scenario must make one successful and one failed attempt.");
 assert.equal(failureScenarioSuccessfulImports, 1, "The failed read must not add a successful import.");
 assert.equal(failureScenarioControlledFailures, 1, "The failure scenario must have one controlled failure.");
+
+const retryRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
+const retryInput = retryRuntime.elements.get("xlsx");
+const retryAlerts = [];
+retryRuntime.runtime.alert = message => { retryAlerts.push(String(message)); };
+const retrySnapshot = () => JSON.parse(JSON.stringify(retryRuntime.api.state));
+const retryIds = state => state.rows.map(row => row.internal);
+const retryRoots = state => state.rows.filter(row => row.parentId === null).map(row => row.internal);
+const retryLabels = state => state.rows.map(row => row.object);
+let retryAttempts = 0;
+let retrySuccessfulImports = 0;
+let retryControlledFailures = 0;
+const invokeRetryScenario = async file => {
+  retryAttempts += 1;
+  retryInput.value = file.name;
+  retryInput.files = [file];
+  await assert.doesNotReject(() => retryInput.onchange({ target: retryInput }), `Read-failure retry handler must complete for ${file.name}.`);
+};
+
+const retryBFile = { name: "structure-b-retry-baseline.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(xlsxBufferB); } };
+await invokeRetryScenario(retryBFile);
+const retryBBeforeFailure = retrySnapshot();
+assert.equal(retryBFile.readCount, 1, "Retry baseline Structure B must be read once.");
+assert.equal(retryInput.value, "", "The retry input must reset after Structure B.");
+assert.ok(retryIds(retryBBeforeFailure).includes(STRUCTURE_B_TABLE_ID), "Retry baseline must contain Structure B table ID.");
+assert.ok(retryIds(retryBBeforeFailure).includes(STRUCTURE_B_FIELD_ID), "Retry baseline must contain Structure B field ID.");
+retrySuccessfulImports += 1;
+
+const RETRY_READ_REJECTION_MARKER = "__LOCAL13C1B1B2_READ_REJECTION__";
+const retryFailedFile = { name: "structure-retry-read-rejection.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.reject(new Error(RETRY_READ_REJECTION_MARKER)); } };
+const retryAlertsBeforeFailure = retryAlerts.length;
+await invokeRetryScenario(retryFailedFile);
+const retryBAfterFailure = retrySnapshot();
+retryControlledFailures += 1;
+assert.equal(retryFailedFile.readCount, 1, "Retry failure File-like object must be read once.");
+assert.equal(retryAlerts.length, retryAlertsBeforeFailure + 1, "Retry failure must raise exactly one controlled alert.");
+assert.ok(retryAlerts.at(-1).includes(RETRY_READ_REJECTION_MARKER), "Retry failure alert must contain the exact marker.");
+assert.equal(retryInput.value, "", "The retry input must reset after the failed read.");
+assert.deepEqual(retryBAfterFailure, retryBBeforeFailure, "Structure B must be preserved before retry.");
+assert.equal(retrySuccessfulImports, 1, "Read failure must not increment retry successful imports.");
+
+const retryAFile = { name: "structure-a-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(xlsxBuffer); } };
+const retryAlertsBeforeA = retryAlerts.length;
+await invokeRetryScenario(retryAFile);
+const retryAFinal = retrySnapshot();
+const retryFinalIds = retryIds(retryAFinal);
+retrySuccessfulImports += 1;
+assert.equal(retryAFile.readCount, 1, "Structure A retry file must be read once.");
+assert.equal(retryInput.value, "", "The retry input must reset after valid Structure A retry.");
+assert.equal(retryAlerts.length, retryAlertsBeforeA, "Valid retry must not raise an additional controlled alert.");
+assert.equal(retryAlerts.filter(message => message.includes(RETRY_READ_REJECTION_MARKER)).length, 1, "The stale failure marker must not repeat after valid retry.");
+assert.ok(retryFinalIds.includes(structureA.tableId), "Retry must import Structure A table ID.");
+assert.ok(retryFinalIds.includes(structureA.fieldId), "Retry must import Structure A field ID.");
+assert.ok(!retryFinalIds.includes(STRUCTURE_B_TABLE_ID), "Retry must replace Structure B table ID.");
+assert.ok(!retryFinalIds.includes(STRUCTURE_B_FIELD_ID), "Retry must replace Structure B field ID.");
+assert.ok(retryLabels(retryAFinal).includes("Table A"), "Retry must retain Structure A table label.");
+assert.ok(!retryLabels(retryAFinal).includes("Table B"), "Retry must remove Structure B table label.");
+assert.deepEqual(retryRoots(retryAFinal), [structureA.tableId], "Retry must replace the Structure B root with Structure A root.");
+assert.deepEqual(new Set(retryFinalIds), new Set([structureA.tableId, structureA.fieldId]), "Final retry state must contain Structure A only.");
+assert.equal(retryAttempts, 3, "Retry scenario must make exactly three handler attempts.");
+assert.equal(retrySuccessfulImports, 2, "Retry scenario must have two successful imports.");
+assert.equal(retryControlledFailures, 1, "Retry scenario must have one controlled failure.");
