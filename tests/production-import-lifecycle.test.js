@@ -218,3 +218,64 @@ assert.deepEqual(new Set(retryFinalIds), new Set([structureA.tableId, structureA
 assert.equal(retryAttempts, 3, "Retry scenario must make exactly three handler attempts.");
 assert.equal(retrySuccessfulImports, 2, "Retry scenario must have two successful imports.");
 assert.equal(retryControlledFailures, 1, "Retry scenario must have one controlled failure.");
+
+const parserRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
+const parserInput = parserRuntime.elements.get("xlsx");
+const parserAlerts = [];
+parserRuntime.runtime.alert = message => { parserAlerts.push(String(message)); };
+const parserSnapshot = () => JSON.parse(JSON.stringify(parserRuntime.api.state));
+const parserIds = state => state.rows.map(row => row.internal);
+const parserRoots = state => state.rows.filter(row => row.parentId === null).map(row => row.internal);
+let parserAttempts = 0;
+let parserSuccessfulImports = 0;
+let parserControlledFailures = 0;
+const invokeParserScenario = async file => {
+  parserAttempts += 1;
+  parserInput.value = file.name;
+  parserInput.files = [file];
+  await assert.doesNotReject(() => parserInput.onchange({ target: parserInput }), `Parser-failure handler must complete for ${file.name}.`);
+};
+
+const parserAFile = { name: "structure-a-parser-baseline.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(xlsxBuffer); } };
+await invokeParserScenario(parserAFile);
+const parserABeforeFailure = parserSnapshot();
+assert.equal(parserAFile.readCount, 1, "Parser baseline Structure A must be read once.");
+assert.equal(parserInput.value, "", "Parser input must reset after Structure A.");
+assert.ok(parserIds(parserABeforeFailure).includes(structureA.tableId), "Parser baseline must contain Structure A table ID.");
+assert.ok(parserIds(parserABeforeFailure).includes(structureA.fieldId), "Parser baseline must contain Structure A field ID.");
+parserSuccessfulImports += 1;
+
+const malformedBytes = new Uint8Array([80, 75, 3, 4, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).buffer;
+const malformedFile = { name: "malformed-parser-input.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(malformedBytes); } };
+const parserAlertsBeforeFailure = parserAlerts.length;
+await invokeParserScenario(malformedFile);
+const parserAAfterFailure = parserSnapshot();
+parserControlledFailures += 1;
+assert.equal(malformedFile.readCount, 1, "Malformed File-like object must be read once.");
+assert.equal(parserAlerts.length, parserAlertsBeforeFailure + 1, "Parser failure must emit exactly one controlled alert.");
+const parserErrorText = parserAlerts.at(-1);
+assert.ok(parserErrorText.length > 0, "Parser failure alert must contain the actual production parser error.");
+assert.equal(parserInput.value, "", "Parser input must reset after malformed input.");
+assert.deepEqual(parserAAfterFailure, parserABeforeFailure, "Structure A semantic snapshot must survive parser failure.");
+assert.ok(parserIds(parserAAfterFailure).includes(structureA.tableId), "Structure A table ID must survive parser failure.");
+assert.ok(!parserIds(parserAAfterFailure).includes(STRUCTURE_B_TABLE_ID), "Structure B must not appear after parser failure.");
+assert.equal(parserSuccessfulImports, 1, "Parser failure must not add a successful import.");
+
+const parserBFile = { name: "structure-b-parser-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(xlsxBufferB); } };
+const parserAlertsBeforeRetry = parserAlerts.length;
+await invokeParserScenario(parserBFile);
+const parserBFinal = parserSnapshot();
+const parserFinalIds = parserIds(parserBFinal);
+parserSuccessfulImports += 1;
+assert.equal(parserBFile.readCount, 1, "Parser retry Structure B must be read once.");
+assert.equal(parserInput.value, "", "Parser input must reset after Structure B retry.");
+assert.equal(parserAlerts.length, parserAlertsBeforeRetry, "Valid parser retry must not add an alert.");
+assert.equal(parserAlerts.filter(message => message === parserErrorText).length, 1, "Stale parser error must not repeat after valid retry.");
+assert.ok(parserFinalIds.includes(STRUCTURE_B_TABLE_ID), "Parser retry must import Structure B table ID.");
+assert.ok(parserFinalIds.includes(STRUCTURE_B_FIELD_ID), "Parser retry must import Structure B field ID.");
+assert.ok(!parserFinalIds.includes(structureA.tableId), "Parser retry must replace Structure A table ID.");
+assert.ok(!parserFinalIds.includes(structureA.fieldId), "Parser retry must replace Structure A field ID.");
+assert.deepEqual(parserRoots(parserBFinal), [STRUCTURE_B_TABLE_ID], "Parser retry must replace Structure A root.");
+assert.equal(parserAttempts, 3, "Parser scenario must make exactly three handler attempts.");
+assert.equal(parserSuccessfulImports, 2, "Parser scenario must have two successful imports.");
+assert.equal(parserControlledFailures, 1, "Parser scenario must have one controlled parser failure.");
