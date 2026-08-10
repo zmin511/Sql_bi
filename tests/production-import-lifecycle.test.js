@@ -79,6 +79,28 @@ assert.ok(labelsAfterA.includes("Table A"), "Structure A table label must be imp
 assert.ok(labelsAfterA.includes("Field A"), "Structure A field label must be imported.");
 assert.ok(rootIdsAfterA.includes(structureA.tableId), "Structure A table must be the imported root.");
 
+const headersOnlyWs = runtime.runtime.XLSX.utils.aoa_to_sheet([structureA.headers]);
+const headersOnlyWb = runtime.runtime.XLSX.utils.book_new();
+runtime.runtime.XLSX.utils.book_append_sheet(headersOnlyWb, headersOnlyWs, "TDSheet");
+const headersOnlyBuffer = runtime.runtime.XLSX.write(headersOnlyWb, { type: "array", bookType: "xlsx" });
+const headersOnlyParsedRows = runtime.runtime.XLSX.utils.sheet_to_json(
+  runtime.runtime.XLSX.read(headersOnlyBuffer, { type: "array" }).Sheets.TDSheet,
+  { defval: "" }
+);
+assert.equal(headersOnlyParsedRows.length, 0, "Headers-only XLSX fixture must parse to an empty row set.");
+const headersOnlyFile = { name: "headers-only-structure.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(headersOnlyBuffer); } };
+const headersOnlyBefore = snapshot();
+const headersOnlyAlertsBefore = alerts;
+await invokeImport(headersOnlyFile);
+const headersOnlyAfter = snapshot();
+assert.equal(headersOnlyFile.readCount, 1, "Headers-only XLSX must be read once.");
+assert.equal(alerts, headersOnlyAlertsBefore, "Current production silently accepts headers-only XLSX without a controlled error.");
+assert.equal(inputValuesAfterAttempts.at(-1), "", "The structure input resets after a headers-only XLSX attempt.");
+assert.equal(headersOnlyAfter.rows.length, 0, "Current production replaces populated state with empty rows after headers-only XLSX.");
+assert.deepEqual(importedIds(headersOnlyAfter), [], "Current production removes Structure A runtime IDs after headers-only XLSX.");
+assert.deepEqual(rootIds(headersOnlyAfter), [], "Current production removes Structure A roots after headers-only XLSX.");
+assert.notDeepEqual(headersOnlyAfter, headersOnlyBefore, "Headers-only XLSX currently violates atomic state preservation.");
+
 await invokeImport(fileB);
 const stateAfterB = snapshot();
 const idsAfterB = importedIds(stateAfterB);
@@ -98,7 +120,7 @@ assert.ok(labelsAfterB.includes("Field B"), "Structure B field label must be imp
 assert.ok(!labelsAfterB.includes("Table A"), "Structure A table label must be absent after Structure B replaces it.");
 assert.ok(!labelsAfterB.includes("Field A"), "Structure A field label must be absent after Structure B replaces it.");
 assert.deepEqual(rootIdsAfterB, [STRUCTURE_B_TABLE_ID], "Structure B must replace the old imported root.");
-assert.equal(changeAttempts, 2, "The test-side real-handler helper must make exactly two change attempts.");
+assert.equal(changeAttempts, 3, "The test-side real-handler helper must make Structure A, headers-only, and Structure B attempts.");
 assert.deepEqual(new Set(idsAfterB), new Set([STRUCTURE_B_TABLE_ID, STRUCTURE_B_FIELD_ID]), "Final imported IDs must contain Structure B only, without mixed or duplicate rows.");
 
 const failureRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
