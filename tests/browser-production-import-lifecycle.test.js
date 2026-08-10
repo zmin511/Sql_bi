@@ -170,6 +170,23 @@ try {
   assert.equal(duplicateImport.after.bodyText, duplicateImport.before.bodyText, "Duplicate browser import must preserve rendered Structure A.");
   assert.equal(duplicateImport.after.sql, duplicateImport.before.sql, "Duplicate browser import must preserve SQL.");
 
+  suiteContext.currentPhase = "immediate-duplicate-retry";
+  const immediateRetry = await evaluate(`(async () => {
+    const input=document.getElementById("xlsx"), XLSX=window.XLSX;
+    const ws=XLSX.utils.aoa_to_sheet([["Объекты","Внутреннее имя","Тип","Уровень"],["Table B","_Document902","",1],["Field B","_Fld902","string",2]]);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"TDSheet"); const bytes=XLSX.write(wb,{type:"array",bookType:"xlsx"}); let reads=0, attempts=0, alertsBefore=window.__local13bAlerts.length;
+    Object.defineProperty(input,"files",{configurable:true,value:[{name:"structure-b-immediate-retry.xlsx",arrayBuffer(){reads+=1;return Promise.resolve(bytes);}}]}); attempts+=1; input.dispatchEvent(new Event("change",{bubbles:true})); await new Promise(resolve=>setTimeout(resolve,100));
+    return {reads,attempts,alertsBefore,alerts:window.__local13bAlerts.slice(),inputValue:input.value,rejections:window.__local13bRejections.slice(),semantic:window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(),bodyText:document.body.innerText};
+  })()`);
+  assert.equal(immediateRetry.reads, 1, "Immediate B retry must be read once.");
+  assert.equal(immediateRetry.attempts, 1, "No import attempt may intervene between duplicate rejection and B.");
+  assert.equal(immediateRetry.alerts.length, immediateRetry.alertsBefore, "Immediate B retry must not repeat duplicate alert.");
+  assert.equal(immediateRetry.inputValue, "", "Immediate B retry input must reset.");
+  assert.deepEqual(immediateRetry.rejections, [], "Immediate B retry must not cause unhandled rejection.");
+  assert.ok(immediateRetry.semantic.rows.some(row=>row.internal==="_Document902") && immediateRetry.semantic.rows.some(row=>row.internal==="_Fld902"), "Immediate B retry must install B.");
+  assert.ok(!immediateRetry.semantic.rows.some(row=>["_Document901","_Fld901","_DocumentDUP901","_DocumentDUP902"].includes(row.internal)), "Immediate B retry must remove A and duplicate IDs.");
+  assert.match(immediateRetry.bodyText,/Table B/,"Immediate retry must render B.");
+
   suiteContext.currentPhase = "populated-read-rejection";
   const failedImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");
@@ -189,8 +206,8 @@ try {
   assert.equal(failedImport.after.inputValue, "", "Browser structure input must reset after populated read failure.");
   assert.equal(failedImport.after.bodyText, failedImport.before.bodyText, "Populated browser UI state must be preserved after read failure.");
   assert.equal(failedImport.after.sql, failedImport.before.sql, "Generated SQL state must be preserved after read failure.");
-  assert.match(failedImport.after.bodyText, /Table A/, "Structure A table label must remain after failed read.");
-  assert.match(failedImport.after.bodyText, /Field A/, "Structure A field label must remain after failed read.");
+  assert.match(failedImport.after.bodyText, /Table B/, "Structure B table label must remain after failed read.");
+  assert.match(failedImport.after.bodyText, /Field B/, "Structure B field label must remain after failed read.");
   assert.deepEqual(failedImport.after.semantic, failedImport.before.semantic, "Failed read must not create an additional runtime state transition.");
   assertLifecycleCounters("A to read failure", {
     attempts: validImport.attempts + failedImport.attempts,
