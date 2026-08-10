@@ -158,6 +158,59 @@ assert.deepEqual(rootIdsAfterB, [STRUCTURE_B_TABLE_ID], "Structure B must replac
 assert.equal(changeAttempts, 3, "The test-side real-handler helper must make Structure A, headers-only, and Structure B attempts.");
 assert.deepEqual(new Set(idsAfterB), new Set([STRUCTURE_B_TABLE_ID, STRUCTURE_B_FIELD_ID]), "Final imported IDs must contain Structure B only, without mixed or duplicate rows.");
 
+const duplicateRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
+const duplicateInput = duplicateRuntime.elements.get("xlsx");
+const duplicateAlerts = [];
+duplicateRuntime.runtime.alert = message => { duplicateAlerts.push(String(message)); };
+const DUPLICATE_ID_HEADERS = ["id", "Объекты", "Внутреннее имя", "Тип", "Уровень"];
+const DUPLICATE_ID_ROWS = [
+  ["dup", "Duplicate Table 901", "_DocumentDUP901", "", 1],
+  ["dup", "Duplicate Table 902", "_DocumentDUP902", "", 1]
+];
+const duplicateIdSheet = duplicateRuntime.runtime.XLSX.utils.aoa_to_sheet([DUPLICATE_ID_HEADERS, ...DUPLICATE_ID_ROWS]);
+const duplicateIdWorkbook = duplicateRuntime.runtime.XLSX.utils.book_new();
+duplicateRuntime.runtime.XLSX.utils.book_append_sheet(duplicateIdWorkbook, duplicateIdSheet, "TDSheet");
+const duplicateIdBytes = duplicateRuntime.runtime.XLSX.write(duplicateIdWorkbook, { type: "array", bookType: "xlsx" });
+assert.ok(duplicateIdBytes.byteLength > 0, "Duplicate-ID XLSX fixture must have bytes.");
+const duplicateIdParsedRows = duplicateRuntime.runtime.XLSX.utils.sheet_to_json(
+  duplicateRuntime.runtime.XLSX.read(duplicateIdBytes, { type: "array" }).Sheets.TDSheet,
+  { defval: "" }
+);
+assert.equal(duplicateIdParsedRows.length, 2, "Duplicate-ID fixture must parse two data rows.");
+assert.deepEqual(Array.from(duplicateIdParsedRows, row => row.id), ["dup", "dup"], "Duplicate-ID fixture must retain both explicit logical IDs.");
+assert.deepEqual(Array.from(duplicateIdParsedRows, row => row["Внутреннее имя"]), ["_DocumentDUP901", "_DocumentDUP902"], "Duplicate-ID fixture internals must remain distinct.");
+
+const duplicateStructureAFile = { name: "structure-a-before-duplicate.xlsx", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(xlsxBuffer); } };
+duplicateInput.value = duplicateStructureAFile.name;
+duplicateInput.files = [duplicateStructureAFile];
+await assert.doesNotReject(() => duplicateInput.onchange({ target: duplicateInput }), "Structure A must import before duplicate-ID characterization.");
+const duplicateBefore = JSON.parse(JSON.stringify(duplicateRuntime.api.state));
+assert.equal(duplicateStructureAFile.readCount, 1, "Structure A before duplicate import must be read once.");
+assert.equal(duplicateInput.value, "", "Duplicate characterization input must reset after Structure A.");
+assert.ok(duplicateBefore.rows.some(row => row.internal === "_Document901"), "Structure A table must exist before duplicate import.");
+assert.ok(duplicateBefore.rows.some(row => row.internal === "_Fld901"), "Structure A field must exist before duplicate import.");
+
+const duplicateIdFile = { name: "duplicate-semantic-ids.xlsx", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(duplicateIdBytes); } };
+const duplicateAlertsBefore = duplicateAlerts.length;
+duplicateInput.value = duplicateIdFile.name;
+duplicateInput.files = [duplicateIdFile];
+await assert.doesNotReject(() => duplicateInput.onchange({ target: duplicateInput }), "Current production handler must complete duplicate-ID import without an unhandled rejection.");
+const duplicateAfter = JSON.parse(JSON.stringify(duplicateRuntime.api.state));
+const duplicateRows = duplicateAfter.rows.filter(row => row.id === "dup");
+assert.equal(duplicateIdFile.readCount, 1, "Duplicate-ID XLSX must be read once.");
+assert.equal(duplicateAlerts.length, duplicateAlertsBefore, "Current production accepts duplicate semantic IDs without a controlled error.");
+assert.equal(duplicateInput.value, "", "Duplicate-ID import must reset the input.");
+assert.equal(duplicateAfter.rows.length, 2, "Current production must install two non-empty parsed semantic rows.");
+assert.equal(duplicateRows.length, 2, "state.rows must retain both duplicate semantic rows.");
+assert.deepEqual(duplicateRows.map(row => row.internal), ["_DocumentDUP901", "_DocumentDUP902"], "state.rows must retain both distinct duplicate-ID internals.");
+assert.equal(duplicateAfter.byId.dup.internal, "_DocumentDUP902", "state.byId must silently retain only the final duplicate identity.");
+assert.equal(Object.keys(duplicateAfter.byId).filter(id => id === "dup").length, 1, "state.byId must expose only one duplicate identity lookup.");
+assert.deepEqual(duplicateAfter.roots.map(row => row.id), ["dup", "dup"], "The tree root list must retain duplicate IDs while lookups collapse them.");
+assert.ok(!duplicateAfter.rows.some(row => row.internal === "_Document901"), "Duplicate import must replace the prior Structure A table.");
+assert.ok(!duplicateAfter.rows.some(row => row.internal === "_Fld901"), "Duplicate import must replace the prior Structure A field.");
+assert.notDeepEqual(duplicateAfter, duplicateBefore, "Duplicate import must replace the complete prior semantic state.");
+console.log("ok - structure import currently accepts duplicate semantic row IDs");
+
 const mxlRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
 const mxlInput = mxlRuntime.elements.get("xlsx");
 const mxlAlerts = [];
