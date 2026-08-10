@@ -114,6 +114,26 @@ try {
   assert.match(retryImport.bodyText, /Field B/, "Browser UI must render Structure B field label.");
   assert.doesNotMatch(retryImport.bodyText, /Table A/, "Browser UI must remove Structure A table label after retry.");
   assert.doesNotMatch(retryImport.bodyText, /Field A/, "Browser UI must remove Structure A field label after retry.");
+
+  const parserFailure = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx");
+    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, alerts: window.__local13bAlerts.slice() };
+    const bytes = new Uint8Array([80,75,3,4,20,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]).buffer;
+    let reads = 0; const file = { name: "malformed-browser-parser.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
+    Object.defineProperty(input, "files", { configurable: true, value: [file] }); input.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return { bytes: bytes.byteLength, reads, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() } };
+  })()`);
+  assert.ok(parserFailure.bytes > 0, "Malformed browser parser fixture must have bytes.");
+  assert.equal(parserFailure.reads, 1, "Malformed browser parser fixture must be read once.");
+  assert.equal(parserFailure.after.alerts.length, parserFailure.before.alerts.length + 1, "Parser failure must emit exactly one controlled alert.");
+  assert.ok(parserFailure.after.alerts.at(-1).length > 0, "Parser controlled alert must contain production parser text.");
+  assert.deepEqual(parserFailure.after.rejections, [], "Parser failure must not cause unhandled rejections.");
+  assert.equal(parserFailure.after.inputValue, "", "Browser input must reset after parser failure.");
+  assert.equal(parserFailure.after.bodyText, parserFailure.before.bodyText, "Structure B UI state must be preserved after parser failure.");
+  assert.equal(parserFailure.after.sql, parserFailure.before.sql, "SQL state must be preserved after parser failure.");
+  assert.match(parserFailure.after.bodyText, /Table B/, "Structure B table label must remain after parser failure.");
+  assert.match(parserFailure.after.bodyText, /Field B/, "Structure B field label must remain after parser failure.");
 } finally {
   if (attempt) await cleanupAttempt(attempt, suiteContext);
   await closeServer(server, sockets);
