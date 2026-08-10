@@ -94,12 +94,12 @@ const headersOnlyAlertsBefore = alerts;
 await invokeImport(headersOnlyFile);
 const headersOnlyAfter = snapshot();
 assert.equal(headersOnlyFile.readCount, 1, "Headers-only XLSX must be read once.");
-assert.equal(alerts, headersOnlyAlertsBefore, "Current production silently accepts headers-only XLSX without a controlled error.");
+assert.equal(alerts, headersOnlyAlertsBefore + 1, "Headers-only XLSX must emit exactly one controlled semantic-validation error.");
 assert.equal(inputValuesAfterAttempts.at(-1), "", "The structure input resets after a headers-only XLSX attempt.");
-assert.equal(headersOnlyAfter.rows.length, 0, "Current production replaces populated state with empty rows after headers-only XLSX.");
-assert.deepEqual(importedIds(headersOnlyAfter), [], "Current production removes Structure A runtime IDs after headers-only XLSX.");
-assert.deepEqual(rootIds(headersOnlyAfter), [], "Current production removes Structure A roots after headers-only XLSX.");
-assert.notDeepEqual(headersOnlyAfter, headersOnlyBefore, "Headers-only XLSX currently violates atomic state preservation.");
+assert.equal(headersOnlyAfter.rows.length, headersOnlyBefore.rows.length, "Headers-only XLSX must preserve populated runtime rows.");
+assert.deepEqual(importedIds(headersOnlyAfter), [structureA.tableId, structureA.fieldId], "Headers-only XLSX must preserve Structure A runtime IDs.");
+assert.deepEqual(rootIds(headersOnlyAfter), [structureA.tableId], "Headers-only XLSX must preserve Structure A roots.");
+assert.deepEqual(headersOnlyAfter, headersOnlyBefore, "Headers-only XLSX must preserve the complete semantic state.");
 
 await invokeImport(fileB);
 const stateAfterB = snapshot();
@@ -110,7 +110,7 @@ assert.equal(fileA.readCount, 1, "Structure B import must not reread Structure A
 assert.equal(fileB.readCount, 1, "Structure B file must be read once.");
 assert.equal(inputValuesAfterAttempts[1], "", "The structure input must reset after Structure B.");
 assert.notDeepEqual(stateAfterB, stateAfterA, "Structure B must produce one observed state transition.");
-assert.equal(alerts, alertsBeforeValidImports, "Valid Structure A and B imports must not raise controlled errors.");
+assert.equal(alerts, alertsBeforeValidImports + 1, "Only the headers-only XLSX must raise a controlled error in this scenario.");
 assert.ok(idsAfterB.includes(STRUCTURE_B_TABLE_ID), "Structure B table ID must be imported.");
 assert.ok(idsAfterB.includes(STRUCTURE_B_FIELD_ID), "Structure B field ID must be imported.");
 assert.ok(!idsAfterB.includes(structureA.tableId), "Structure A table ID must be absent after Structure B replaces it.");

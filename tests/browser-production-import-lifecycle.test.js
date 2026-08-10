@@ -115,6 +115,40 @@ try {
     successfulImports: validImport.semantic.rows.some(row => row.internal === "_Document901") && validImport.semantic.rows.some(row => row.internal === "_Fld901") ? 1 : 0
   }, { attempts: 1, reads: 1, controlledErrors: 0, unhandledRejections: 0, successfulImports: 1 });
 
+  suiteContext.currentPhase = "headers-only-xlsx";
+  const headersOnlyImport = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, alerts: window.__local13bAlerts.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() };
+    const ws = XLSX.utils.aoa_to_sheet([["Объекты", "Внутреннее имя", "Тип", "Уровень"]]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
+    const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const parsedRows = XLSX.utils.sheet_to_json(XLSX.read(bytes, { type: "array" }).Sheets.TDSheet, { defval: "" });
+    let reads = 0, attempts = 0;
+    const file = { name: "headers-only-browser.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
+    Object.defineProperty(input, "files", { configurable: true, value: [file] }); attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return { byteLength: bytes.byteLength, parsedRows: parsedRows.length, reads, attempts, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() } };
+  })()`);
+  assert.ok(headersOnlyImport.byteLength > 0, "Headers-only browser XLSX fixture must have bytes.");
+  assert.equal(headersOnlyImport.parsedRows, 0, "Headers-only browser XLSX must parse to zero rows.");
+  assert.equal(headersOnlyImport.reads, 1, "Headers-only browser XLSX must be read once.");
+  assert.equal(headersOnlyImport.after.alerts.length, headersOnlyImport.before.alerts.length + 1, "Headers-only XLSX must emit exactly one controlled error.");
+  assert.match(headersOnlyImport.after.alerts.at(-1), /Файл не содержит данных структуры\./, "Headers-only XLSX alert must identify the semantic validation failure.");
+  assert.deepEqual(headersOnlyImport.after.rejections, [], "Headers-only XLSX must not cause unhandled rejections.");
+  assert.equal(headersOnlyImport.after.inputValue, "", "Browser structure input must reset after headers-only XLSX.");
+  assert.equal(headersOnlyImport.after.bodyText, headersOnlyImport.before.bodyText, "Headers-only XLSX must preserve the rendered Structure A UI.");
+  assert.equal(headersOnlyImport.after.sql, headersOnlyImport.before.sql, "Headers-only XLSX must preserve generated SQL.");
+  assert.deepEqual(headersOnlyImport.after.semantic, headersOnlyImport.before.semantic, "Headers-only XLSX must preserve the complete semantic state.");
+  assert.ok(headersOnlyImport.after.semantic.rows.some(row => row.internal === "_Document901"), "Headers-only XLSX must preserve Structure A table ID.");
+  assert.ok(headersOnlyImport.after.semantic.rows.some(row => row.internal === "_Fld901"), "Headers-only XLSX must preserve Structure A field ID.");
+  assertLifecycleCounters("A to headers-only XLSX", {
+    attempts: validImport.attempts + headersOnlyImport.attempts,
+    reads: validImport.reads + headersOnlyImport.reads,
+    controlledErrors: headersOnlyImport.after.alerts.length - headersOnlyImport.before.alerts.length,
+    unhandledRejections: headersOnlyImport.after.rejections.length,
+    successfulImports: 1
+  }, { attempts: 2, reads: 2, controlledErrors: 1, unhandledRejections: 0, successfulImports: 1 });
+
   suiteContext.currentPhase = "populated-read-rejection";
   const failedImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");

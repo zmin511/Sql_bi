@@ -4531,6 +4531,9 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
           const json = XLSX.utils.sheet_to_json(sheet, { defval:"" });
           rows = rowsFromTableObjects(json);
         }
+        if(!Array.isArray(rows) || rows.length===0){
+          throw new Error("Файл не содержит данных структуры.");
+        }
         importRows(rows);
       } catch(err){
         alert("Не удалось загрузить файл: " + (err && err.message ? err.message : err));
