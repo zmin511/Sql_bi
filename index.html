@@ -2744,8 +2744,8 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     }
 
     function buildTree(rows){
-      const byId = {}; rows.forEach(r=>byId[r.id]=r);
-      const children = {}; const roots = [];
+      const byId = Object.create(null); rows.forEach(r=>byId[r.id]=r);
+      const children = Object.create(null); const roots = [];
       rows.forEach(r=>{
         const p = r.parentId && byId[r.parentId] ? r.parentId : null;
         if(!p) roots.push(r);

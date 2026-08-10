@@ -508,3 +508,47 @@ assert.deepEqual(parserRoots(parserBFinal), [STRUCTURE_B_TABLE_ID], "Parser retr
 assert.equal(parserAttempts, 3, "Parser scenario must make exactly three handler attempts.");
 assert.equal(parserSuccessfulImports, 2, "Parser scenario must have two successful imports.");
 assert.equal(parserControlledFailures, 1, "Parser scenario must have one controlled parser failure.");
+
+const specialKeyRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
+const specialKeyInput = specialKeyRuntime.elements.get("xlsx");
+const specialKeyAlerts = [];
+specialKeyRuntime.runtime.alert = message => { specialKeyAlerts.push(String(message)); };
+const SPECIAL_ROOT_ID = "__proto__";
+const SPECIAL_ROOT_CHAR_CODES = [95, 95, 112, 114, 111, 116, 111, 95, 95];
+assert.equal(JSON.stringify(SPECIAL_ROOT_ID), '"__proto__"', "Special-key fixture must use the literal logical ID.");
+assert.deepEqual(Array.from(SPECIAL_ROOT_ID, character => character.charCodeAt(0)), SPECIAL_ROOT_CHAR_CODES, "Special-key fixture must preserve the literal __proto__ code points.");
+const specialKeySheet = specialKeyRuntime.runtime.XLSX.utils.aoa_to_sheet([
+  ["id", "object", "internal", "parent", "type", "level"],
+  [SPECIAL_ROOT_ID, "Special root", "_DocumentSPECIALKEY901", "", "", 0],
+  ["specialChild", "Special child", "_FldSPECIALKEY901", SPECIAL_ROOT_ID, "string", 1]
+]);
+const specialKeyWorkbook = specialKeyRuntime.runtime.XLSX.utils.book_new();
+specialKeyRuntime.runtime.XLSX.utils.book_append_sheet(specialKeyWorkbook, specialKeySheet, "TDSheet");
+const specialKeyBytes = specialKeyRuntime.runtime.XLSX.write(specialKeyWorkbook, { type: "array", bookType: "xlsx" });
+const specialKeyParsed = specialKeyRuntime.runtime.XLSX.utils.sheet_to_json(
+  specialKeyRuntime.runtime.XLSX.read(specialKeyBytes, { type: "array" }).Sheets.TDSheet,
+  { defval: "" }
+);
+assert.deepEqual(Array.from(specialKeyParsed, row => row.id), [SPECIAL_ROOT_ID, "specialChild"], "Special-key workbook must parse both literal IDs.");
+assert.equal(specialKeyParsed[1].parent, SPECIAL_ROOT_ID, "Special child must retain the literal special parent ID.");
+const objectPrototypeBefore = Object.getOwnPropertyNames(Object.prototype).sort();
+const specialKeyFile = { name: "literal-special-key.xlsx", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(specialKeyBytes); } };
+specialKeyInput.value = specialKeyFile.name;
+specialKeyInput.files = [specialKeyFile];
+await assert.doesNotReject(() => specialKeyInput.onchange({ target: specialKeyInput }), "Literal special-key import must complete through the production handler.");
+const specialState = specialKeyRuntime.api.state;
+const importedRoot = specialState.rows.find(row => row.id === SPECIAL_ROOT_ID);
+const importedChild = specialState.rows.find(row => row.id === "specialChild");
+assert.equal(specialKeyFile.readCount, 1, "Special-key XLSX must be read once.");
+assert.equal(specialKeyAlerts.length, 0, "Special-key import must not emit a controlled alert.");
+assert.equal(specialKeyInput.value, "", "Special-key import must reset the input.");
+assert.deepEqual(Array.from(specialState.rows, row => row.id), [SPECIAL_ROOT_ID, "specialChild"], "Special-key import must install exactly both semantic rows.");
+assert.equal(Object.prototype.hasOwnProperty.call(specialState.byId, SPECIAL_ROOT_ID), true, "byId must own the literal special root key.");
+assert.strictEqual(specialState.byId[SPECIAL_ROOT_ID], importedRoot, "byId literal lookup must return the imported root row.");
+assert.equal(Object.prototype.hasOwnProperty.call(specialState.children, SPECIAL_ROOT_ID), true, "children must own the literal special root key.");
+assert.ok(Array.isArray(specialState.children[SPECIAL_ROOT_ID]), "children literal lookup must return an Array.");
+assert.strictEqual(specialState.children[SPECIAL_ROOT_ID][0], importedChild, "children literal lookup must contain the imported child row.");
+assert.ok(specialState.roots.includes(importedRoot), "Special root must remain in roots.");
+assert.equal(importedChild.parentId, SPECIAL_ROOT_ID, "Special child must retain its literal root relation.");
+assert.deepEqual(Object.getOwnPropertyNames(Object.prototype).sort(), objectPrototypeBefore, "Special-key import must not mutate Object.prototype.");
+console.log("ok - structure import preserves literal __proto__ semantic IDs without prototype mutation");

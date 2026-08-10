@@ -77,6 +77,36 @@ try {
   assert.deepEqual(result.rejections, [], "Production structure import must not cause an unhandled rejection in a real browser.");
   assert.deepEqual({ sql: result.sql, inputValue: result.inputValue }, before, "A failed read must preserve the rendered state and reset the structure input.");
 
+  suiteContext.currentPhase = "literal-special-key-import";
+  const specialKeyImport = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const rootId = "__proto__";
+    const charCodes = Array.from(rootId, character => character.charCodeAt(0));
+    const headers = ["id", "object", "internal", "parent", "type", "level"];
+    const rows = [[rootId, "Special root", "_DocumentSPECIALKEY_BROWSER", "", "", 0], ["specialChild", "Special child", "_FldSPECIALKEY_BROWSER", rootId, "string", 1]];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
+    const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const parsed = XLSX.utils.sheet_to_json(XLSX.read(bytes, { type: "array" }).Sheets.TDSheet, { defval: "" });
+    const alertsBefore = window.__local13bAlerts.length; let reads = 0;
+    Object.defineProperty(input, "files", { configurable: true, value: [{ name: "literal-special-key-browser.xlsx", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } }] });
+    input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    return { rootJson: JSON.stringify(rootId), charCodes, parsedIds: parsed.map(row => row.id), parsedParent: parsed[1].parent, reads, alertsBefore, after: { inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() } };
+  })()`);
+  assert.equal(specialKeyImport.rootJson, '"__proto__"', "Browser fixture must use the literal special root key.");
+  assert.deepEqual(specialKeyImport.charCodes, [95, 95, 112, 114, 111, 116, 111, 95, 95], "Browser fixture must preserve literal special-key code points.");
+  assert.deepEqual(specialKeyImport.parsedIds, ["__proto__", "specialChild"], "Browser workbook must parse both literal IDs.");
+  assert.equal(specialKeyImport.parsedParent, "__proto__", "Browser workbook must preserve the literal child parent key.");
+  assert.equal(specialKeyImport.reads, 1, "Browser special-key XLSX must be read once.");
+  assert.equal(specialKeyImport.after.alerts.length, specialKeyImport.alertsBefore, "Browser special-key import must not alert.");
+  assert.equal(specialKeyImport.after.inputValue, "", "Browser special-key import must reset the input.");
+  assert.deepEqual(specialKeyImport.after.rejections, [], "Browser special-key import must not cause unhandled rejections.");
+  assert.ok(specialKeyImport.after.semantic.rows.some(row => row.id === "__proto__"), "Browser semantic snapshot must contain the literal root ID.");
+  assert.ok(specialKeyImport.after.semantic.rows.some(row => row.id === "specialChild" && row.parentId === "__proto__"), "Browser semantic snapshot must preserve the child relation.");
+  assert.ok(specialKeyImport.after.semantic.rootIds.includes("__proto__"), "Browser semantic snapshot must preserve the special root.");
+  assert.match(specialKeyImport.after.bodyText, /Special root/, "Browser tree must render the special root.");
+  assert.match(specialKeyImport.after.bodyText, /Special child/, "Browser tree must render the special child.");
+
   suiteContext.currentPhase = "valid-xlsx-import";
   const validImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");
