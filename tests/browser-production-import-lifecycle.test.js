@@ -6,6 +6,8 @@ import { CdpClient, listenServer, closeServer, launchBrowserPage, cleanupAttempt
 const marker = "__LOCAL13B_BROWSER_ARRAY_BUFFER_REJECTION__";
 const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8").replace(/<\/body>\s*<\/html>\s*$/, `<script>
 window.__local13bRejections=[];
+window.__local13bAlerts=[];
+window.alert=message => window.__local13bAlerts.push(String(message));
 window.addEventListener("unhandledrejection", event => window.__local13bRejections.push(String(event.reason && event.reason.message || event.reason)));
 </script></body></html>`);
 const server = http.createServer((_request, response) => {
@@ -70,6 +72,28 @@ try {
   assert.deepEqual(validImport.rejections, [], "Valid browser XLSX import must not cause unhandled rejections.");
   assert.match(validImport.bodyText, /Table A/, "Browser UI must render Structure A table label.");
   assert.match(validImport.bodyText, /Field A/, "Browser UI must render Structure A field label.");
+
+  suiteContext.currentPhase = "populated-read-rejection";
+  const failedImport = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx");
+    const marker = "__LOCAL13C1B2B1_BROWSER_READ_REJECTION__";
+    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() };
+    let reads = 0;
+    const file = { name: "structure-a-read-rejection.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.reject(new Error(marker)); } };
+    Object.defineProperty(input, "files", { configurable: true, value: [file] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return { marker, reads, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() } };
+  })()`);
+  assert.equal(failedImport.reads, 1, "Populated browser read-failure file must be read once.");
+  assert.equal(failedImport.after.alerts.length, failedImport.before.alerts.length + 1, "Populated read failure must emit exactly one controlled alert.");
+  assert.ok(failedImport.after.alerts.at(-1).includes(failedImport.marker), "Controlled browser alert must contain the exact read marker.");
+  assert.deepEqual(failedImport.after.rejections, [], "Populated read failure must not cause unhandled rejections.");
+  assert.equal(failedImport.after.inputValue, "", "Browser structure input must reset after populated read failure.");
+  assert.equal(failedImport.after.bodyText, failedImport.before.bodyText, "Populated browser UI state must be preserved after read failure.");
+  assert.equal(failedImport.after.sql, failedImport.before.sql, "Generated SQL state must be preserved after read failure.");
+  assert.match(failedImport.after.bodyText, /Table A/, "Structure A table label must remain after failed read.");
+  assert.match(failedImport.after.bodyText, /Field A/, "Structure A field label must remain after failed read.");
 } finally {
   if (attempt) await cleanupAttempt(attempt, suiteContext);
   await closeServer(server, sockets);
