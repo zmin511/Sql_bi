@@ -134,6 +134,24 @@ try {
   assert.equal(parserFailure.after.sql, parserFailure.before.sql, "SQL state must be preserved after parser failure.");
   assert.match(parserFailure.after.bodyText, /Table B/, "Structure B table label must remain after parser failure.");
   assert.match(parserFailure.after.bodyText, /Field B/, "Structure B field label must remain after parser failure.");
+
+  const parserRetry = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const ws = XLSX.utils.aoa_to_sheet([["Объекты", "Внутреннее имя", "Тип", "Уровень"], ["Table A", "_Document901", "", 1], ["Field A", "_Fld901", "string", 2]]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet"); const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    let reads = 0; const file = { name: "structure-a-parser-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
+    const alertsBefore = window.__local13bAlerts.length;
+    Object.defineProperty(input, "files", { configurable: true, value: [file] }); input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    return { reads, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, rejections: window.__local13bRejections.slice() };
+  })()`);
+  assert.equal(parserRetry.reads, 1, "Parser retry Structure A must be read once.");
+  assert.equal(parserRetry.inputValue, "", "Input must reset after parser retry.");
+  assert.equal(parserRetry.alerts.length, parserRetry.alertsBefore, "Valid parser retry must not add an alert.");
+  assert.deepEqual(parserRetry.rejections, [], "Valid parser retry must not cause unhandled rejections.");
+  assert.match(parserRetry.bodyText, /Table A/, "Parser retry must render Structure A table label.");
+  assert.match(parserRetry.bodyText, /Field A/, "Parser retry must render Structure A field label.");
+  assert.doesNotMatch(parserRetry.bodyText, /Table B/, "Parser retry must remove Structure B table label.");
+  assert.doesNotMatch(parserRetry.bodyText, /Field B/, "Parser retry must remove Structure B field label.");
 } finally {
   if (attempt) await cleanupAttempt(attempt, suiteContext);
   await closeServer(server, sockets);
