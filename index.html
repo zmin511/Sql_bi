@@ -4541,6 +4541,18 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
           }
           seenIds.add(row.id);
         }
+        const rowsById = new Map(rows.map(row => [row.id, row]));
+        for(const row of rows){
+          const path = new Set();
+          let current = row;
+          while(current && current.parentId && rowsById.has(current.parentId)){
+            if(path.has(current.id)){
+              throw new Error("Файл содержит циклические связи в иерархии структуры.");
+            }
+            path.add(current.id);
+            current = rowsById.get(current.parentId);
+          }
+        }
         importRows(rows);
       } catch(err){
         alert("Не удалось загрузить файл: " + (err && err.message ? err.message : err));
