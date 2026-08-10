@@ -4,7 +4,23 @@ import http from "node:http";
 import { CdpClient, listenServer, closeServer, launchBrowserPage, cleanupAttempt } from "./helpers/browser-launch-layer.mjs";
 
 const marker = "__LOCAL13B_BROWSER_ARRAY_BUFFER_REJECTION__";
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8").replace(/<\/body>\s*<\/html>\s*$/, `<script>
+const instrumentationAnchor = "    // init\n    renderTree(); renderSQL();";
+const instrumentation = `    window.__SQLBI_IMPORT_BROWSER_TEST__ = Object.freeze({
+      semantic: () => ({
+        rows: state.rows.map(row => ({ id: row.id, parentId: row.parentId, internal: row.internal, object: row.object, title: row.title, type: row.type })),
+        rootIds: state.roots.map(row => row.id),
+        fieldIds: state.rows.filter(row => row.parentId).map(row => row.id),
+        labels: state.rows.map(row => row.title || row.object),
+        selectedIds: Object.keys(state.selected).filter(id => state.selected[id]).sort(),
+        filters: { boolFilters: state.boolFilters, relationMode: state.relationMode },
+        period: { periodFieldId: state.periodFieldId, periodMode: state.periodMode, dateFrom: state.dateFrom, dateTo: state.dateTo },
+        queryPlan: state.queryPlan, sql: state.queryResult && state.queryResult.sql || "", graphView: state.queryGraph
+      })
+    });
+`;
+const sourceHtml = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+if (sourceHtml.split(instrumentationAnchor).length - 1 !== 1) throw new Error("Expected one production instrumentation anchor.");
+const html = sourceHtml.replace(instrumentationAnchor, `${instrumentation}${instrumentationAnchor}`).replace(/<\/body>\s*<\/html>\s*$/, `<script>
 window.__local13bRejections=[];
 window.__local13bAlerts=[];
 window.alert=message => window.__local13bAlerts.push(String(message));
@@ -63,7 +79,7 @@ try {
     Object.defineProperty(input, "files", { configurable: true, value: [file] });
     input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 100));
-    return { hasXlsx: true, byteLength: bytes.byteLength, reads, inputValue: input.value, bodyText: document.body.innerText, rejections: window.__local13bRejections.slice() };
+    return { hasXlsx: true, byteLength: bytes.byteLength, reads, inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), rejections: window.__local13bRejections.slice() };
   })()`);
   assert.equal(validImport.hasXlsx, true, "Production page must expose embedded SheetJS.");
   assert.ok(validImport.byteLength > 0, "Browser Structure A XLSX buffer must not be empty.");
@@ -72,6 +88,8 @@ try {
   assert.deepEqual(validImport.rejections, [], "Valid browser XLSX import must not cause unhandled rejections.");
   assert.match(validImport.bodyText, /Table A/, "Browser UI must render Structure A table label.");
   assert.match(validImport.bodyText, /Field A/, "Browser UI must render Structure A field label.");
+  assert.ok(validImport.semantic.rows.some(row => row.internal === "_Document901"), "Runtime state must contain Structure A table ID.");
+  assert.ok(validImport.semantic.rows.some(row => row.internal === "_Fld901"), "Runtime state must contain Structure A field ID.");
 
   suiteContext.currentPhase = "populated-read-rejection";
   const failedImport = await evaluate(`(async () => {
@@ -104,7 +122,7 @@ try {
     const alertsBefore = window.__local13bAlerts.length;
     Object.defineProperty(input, "files", { configurable: true, value: [file] }); input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 100));
-    return { reads, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, rejections: window.__local13bRejections.slice() };
+    return { reads, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), rejections: window.__local13bRejections.slice() };
   })()`);
   assert.equal(retryImport.reads, 1, "Browser retry Structure B must be read once.");
   assert.equal(retryImport.inputValue, "", "Browser input must reset after Structure B retry.");
@@ -114,6 +132,9 @@ try {
   assert.match(retryImport.bodyText, /Field B/, "Browser UI must render Structure B field label.");
   assert.doesNotMatch(retryImport.bodyText, /Table A/, "Browser UI must remove Structure A table label after retry.");
   assert.doesNotMatch(retryImport.bodyText, /Field A/, "Browser UI must remove Structure A field label after retry.");
+  assert.ok(retryImport.semantic.rows.some(row => row.internal === "_Document902"), "Runtime state must contain Structure B table ID.");
+  assert.ok(retryImport.semantic.rows.some(row => row.internal === "_Fld902"), "Runtime state must contain Structure B field ID.");
+  assert.ok(!retryImport.semantic.rows.some(row => row.internal === "_Document901" || row.internal === "_Fld901"), "Runtime state must remove Structure A IDs after Structure B import.");
 
   const parserFailure = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");
