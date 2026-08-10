@@ -115,6 +115,56 @@ try {
     successfulImports: validImport.semantic.rows.some(row => row.internal === "_Document901") && validImport.semantic.rows.some(row => row.internal === "_Fld901") ? 1 : 0
   }, { attempts: 1, reads: 1, controlledErrors: 0, unhandledRejections: 0, successfulImports: 1 });
 
+  const hierarchySequence = ["A"];
+  suiteContext.currentPhase = "two-node-cycle";
+  const cycleImport = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), alerts: window.__local13bAlerts.slice() };
+    const headers = ["id", "Объекты", "Внутреннее имя", "Родитель", "Тип", "Уровень"];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ["cycleA", "Cycle A", "_DocumentCYCLEA", "cycleB", "", 1], ["cycleB", "Cycle B", "_DocumentCYCLEB", "cycleA", "", 1]]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
+    const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const parsed = XLSX.utils.sheet_to_json(XLSX.read(bytes, { type: "array" }).Sheets.TDSheet, { defval: "" });
+    let reads = 0, attempts = 0;
+    Object.defineProperty(input, "files", { configurable: true, value: [{ name: "two-node-cycle-browser.xlsx", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } }] });
+    attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    return { byteLength: bytes.byteLength, parsed: parsed.map(row => [row.id, row["Родитель"]]), reads, attempts, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() } };
+  })()`);
+  hierarchySequence.push("CYCLE_REJECTED");
+  assert.ok(cycleImport.byteLength > 0, "Two-node browser cycle XLSX must have bytes.");
+  assert.deepEqual(cycleImport.parsed, [["cycleA", "cycleB"], ["cycleB", "cycleA"]], "Two-node browser cycle fixture must parse reciprocal parent links.");
+  assert.equal(cycleImport.reads, 1, "Two-node browser cycle XLSX must be read once.");
+  assert.equal(cycleImport.attempts, 1, "Cycle rejection must use exactly one actual import attempt.");
+  assert.equal(cycleImport.after.alerts.length, cycleImport.before.alerts.length + 1, "Two-node browser cycle must emit exactly one controlled hierarchy alert.");
+  assert.match(cycleImport.after.alerts.at(-1), /циклические связи в иерархии структуры/, "Two-node browser cycle alert must use the hierarchy contract fragment.");
+  assert.equal(cycleImport.after.inputValue, "", "Two-node browser cycle rejection must reset the input.");
+  assert.deepEqual(cycleImport.after.rejections, [], "Two-node browser cycle must not cause unhandled rejections.");
+  assert.deepEqual(cycleImport.after.semantic, cycleImport.before.semantic, "Two-node browser cycle must preserve the complete Structure A semantic state.");
+  assert.equal(cycleImport.after.bodyText, cycleImport.before.bodyText, "Two-node browser cycle must preserve Structure A UI.");
+  assert.equal(cycleImport.after.sql, cycleImport.before.sql, "Two-node browser cycle must preserve SQL.");
+  assert.ok(!cycleImport.after.semantic.rows.some(row => ["cycleA", "cycleB"].includes(row.id)), "Two-node browser cycle rows must not be installed.");
+
+  suiteContext.currentPhase = "immediate-cycle-retry";
+  const cycleRetry = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const ws = XLSX.utils.aoa_to_sheet([["Объекты", "Внутреннее имя", "Тип", "Уровень"], ["Table B", "_Document902", "", 1], ["Field B", "_Fld902", "string", 2]]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet"); const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    let reads = 0, attempts = 0, alertsBefore = window.__local13bAlerts.length;
+    Object.defineProperty(input, "files", { configurable: true, value: [{ name: "structure-b-after-cycle.xlsx", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } }] });
+    attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    return { reads, attempts, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, rejections: window.__local13bRejections.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), bodyText: document.body.innerText };
+  })()`);
+  hierarchySequence.push("B");
+  assert.deepEqual(hierarchySequence, ["A", "CYCLE_REJECTED", "B"], "Direct hierarchy lifecycle must be A → CYCLE_REJECTED → B.");
+  assert.equal(cycleRetry.attempts, 1, "There must be zero intermediate import attempts between cycle rejection and B.");
+  assert.equal(cycleRetry.reads, 1, "Immediate B retry after cycle rejection must be read once.");
+  assert.equal(cycleRetry.alerts.length, cycleRetry.alertsBefore, "Immediate B retry must not repeat the hierarchy alert.");
+  assert.equal(cycleRetry.inputValue, "", "Immediate B retry after cycle rejection must reset the input.");
+  assert.deepEqual(cycleRetry.rejections, [], "Immediate B retry after cycle rejection must not cause unhandled rejections.");
+  assert.ok(cycleRetry.semantic.rows.some(row => row.internal === "_Document902") && cycleRetry.semantic.rows.some(row => row.internal === "_Fld902"), "Immediate B retry must install B.");
+  assert.ok(!cycleRetry.semantic.rows.some(row => ["_Document901", "_Fld901", "_DocumentCYCLEA", "_DocumentCYCLEB"].includes(row.internal)), "Immediate B retry must remove A and exclude cycle IDs.");
+  assert.match(cycleRetry.bodyText, /Table B/, "Immediate B retry after cycle rejection must render B.");
+
   suiteContext.currentPhase = "headers-only-xlsx";
   const headersOnlyImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx"), XLSX = window.XLSX;
@@ -139,9 +189,9 @@ try {
   assert.equal(headersOnlyImport.after.bodyText, headersOnlyImport.before.bodyText, "Headers-only XLSX must preserve the rendered Structure A UI.");
   assert.equal(headersOnlyImport.after.sql, headersOnlyImport.before.sql, "Headers-only XLSX must preserve generated SQL.");
   assert.deepEqual(headersOnlyImport.after.semantic, headersOnlyImport.before.semantic, "Headers-only XLSX must preserve the complete semantic state.");
-  assert.ok(headersOnlyImport.after.semantic.rows.some(row => row.internal === "_Document901"), "Headers-only XLSX must preserve Structure A table ID.");
-  assert.ok(headersOnlyImport.after.semantic.rows.some(row => row.internal === "_Fld901"), "Headers-only XLSX must preserve Structure A field ID.");
-  assertLifecycleCounters("A to headers-only XLSX", {
+  assert.ok(headersOnlyImport.after.semantic.rows.some(row => row.internal === "_Document902"), "Headers-only XLSX must preserve Structure B table ID.");
+  assert.ok(headersOnlyImport.after.semantic.rows.some(row => row.internal === "_Fld902"), "Headers-only XLSX must preserve Structure B field ID.");
+  assertLifecycleCounters("B retry to headers-only XLSX", {
     attempts: validImport.attempts + headersOnlyImport.attempts,
     reads: validImport.reads + headersOnlyImport.reads,
     controlledErrors: headersOnlyImport.after.alerts.length - headersOnlyImport.before.alerts.length,
