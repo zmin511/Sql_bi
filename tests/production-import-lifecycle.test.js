@@ -552,3 +552,38 @@ assert.ok(specialState.roots.includes(importedRoot), "Special root must remain i
 assert.equal(importedChild.parentId, SPECIAL_ROOT_ID, "Special child must retain its literal root relation.");
 assert.deepEqual(Object.getOwnPropertyNames(Object.prototype).sort(), objectPrototypeBefore, "Special-key import must not mutate Object.prototype.");
 console.log("ok - structure import preserves literal __proto__ semantic IDs without prototype mutation");
+
+const zeroIdRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
+const zeroIdInput = zeroIdRuntime.elements.get("xlsx");
+const zeroIdAlerts = [];
+zeroIdRuntime.runtime.alert = message => { zeroIdAlerts.push(String(message)); };
+const zeroIdSheet = zeroIdRuntime.runtime.XLSX.utils.aoa_to_sheet([
+  ["id", "object", "internal", "parent", "type", "level"],
+  [0, "Zero root", "_DocumentZERO901", "", "", 0],
+  ["zeroChild", "Zero child", "_FldZERO901", 0, "string", 1]
+]);
+const zeroIdWorkbook = zeroIdRuntime.runtime.XLSX.utils.book_new();
+zeroIdRuntime.runtime.XLSX.utils.book_append_sheet(zeroIdWorkbook, zeroIdSheet, "TDSheet");
+const zeroIdBytes = zeroIdRuntime.runtime.XLSX.write(zeroIdWorkbook, { type: "array", bookType: "xlsx" });
+const zeroIdParsed = zeroIdRuntime.runtime.XLSX.utils.sheet_to_json(
+  zeroIdRuntime.runtime.XLSX.read(zeroIdBytes, { type: "array" }).Sheets.TDSheet,
+  { defval: "" }
+);
+assert.strictEqual(zeroIdParsed[0].id, 0, "Zero-ID workbook must preserve its explicit numeric root ID.");
+assert.strictEqual(zeroIdParsed[1].parent, 0, "Zero-ID workbook must preserve its explicit numeric parent ID.");
+const zeroIdFile = { name: "zero-semantic-id.xlsx", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(zeroIdBytes); } };
+zeroIdInput.value = zeroIdFile.name;
+zeroIdInput.files = [zeroIdFile];
+await assert.doesNotReject(() => zeroIdInput.onchange({ target: zeroIdInput }), "Zero-ID import must complete through the production handler.");
+const zeroIdState = zeroIdRuntime.api.state;
+const zeroRoot = zeroIdState.rows.find(row => row.id === "0");
+const zeroChild = zeroIdState.rows.find(row => row.id === "zeroChild");
+assert.equal(zeroIdFile.readCount, 1, "Zero-ID XLSX must be read once.");
+assert.equal(zeroIdAlerts.length, 0, "Zero-ID import must not emit a controlled alert.");
+assert.equal(zeroIdInput.value, "", "Zero-ID import must reset the input.");
+assert.deepEqual(Array.from(zeroIdState.rows, row => row.id), ["0", "zeroChild"], "Zero-ID import must retain both explicit semantic IDs.");
+assert.strictEqual(zeroIdState.byId["0"], zeroRoot, "byId must retain the explicit zero root ID.");
+assert.strictEqual(zeroIdState.children["0"][0], zeroChild, "children must retain the explicit zero parent relationship.");
+assert.ok(zeroIdState.roots.includes(zeroRoot), "Explicit zero root must remain in roots.");
+assert.equal(zeroChild.parentId, "0", "Zero child must retain the explicit zero parent ID.");
+console.log("ok - structure import preserves explicit zero semantic IDs and parent links");

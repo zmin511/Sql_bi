@@ -107,6 +107,32 @@ try {
   assert.match(specialKeyImport.after.bodyText, /Special root/, "Browser tree must render the special root.");
   assert.match(specialKeyImport.after.bodyText, /Special child/, "Browser tree must render the special child.");
 
+  suiteContext.currentPhase = "zero-semantic-id-import";
+  const zeroIdImport = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const headers = ["id", "object", "internal", "parent", "type", "level"];
+    const rows = [[0, "Zero root", "_DocumentZERO_BROWSER", "", "", 0], ["zeroChild", "Zero child", "_FldZERO_BROWSER", 0, "string", 1]];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
+    const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const parsed = XLSX.utils.sheet_to_json(XLSX.read(bytes, { type: "array" }).Sheets.TDSheet, { defval: "" });
+    const alertsBefore = window.__local13bAlerts.length; let reads = 0;
+    Object.defineProperty(input, "files", { configurable: true, value: [{ name: "zero-semantic-id-browser.xlsx", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } }] });
+    input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    return { parsedRootId: parsed[0].id, parsedChildParent: parsed[1].parent, reads, alertsBefore, after: { inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() } };
+  })()`);
+  assert.strictEqual(zeroIdImport.parsedRootId, 0, "Browser workbook must preserve explicit numeric root ID zero.");
+  assert.strictEqual(zeroIdImport.parsedChildParent, 0, "Browser workbook must preserve explicit numeric parent ID zero.");
+  assert.equal(zeroIdImport.reads, 1, "Browser zero-ID XLSX must be read once.");
+  assert.equal(zeroIdImport.after.alerts.length, zeroIdImport.alertsBefore, "Browser zero-ID import must not alert.");
+  assert.equal(zeroIdImport.after.inputValue, "", "Browser zero-ID import must reset the input.");
+  assert.deepEqual(zeroIdImport.after.rejections, [], "Browser zero-ID import must not cause unhandled rejections.");
+  assert.ok(zeroIdImport.after.semantic.rows.some(row => row.id === "0"), "Browser semantic snapshot must preserve the explicit zero root ID.");
+  assert.ok(zeroIdImport.after.semantic.rows.some(row => row.id === "zeroChild" && row.parentId === "0"), "Browser semantic snapshot must preserve the explicit zero parent relation.");
+  assert.ok(zeroIdImport.after.semantic.rootIds.includes("0"), "Browser semantic snapshot must preserve zero root placement.");
+  assert.match(zeroIdImport.after.bodyText, /Zero root/, "Browser tree must render the zero root.");
+  assert.match(zeroIdImport.after.bodyText, /Zero child/, "Browser tree must render the zero child.");
+
   suiteContext.currentPhase = "valid-xlsx-import";
   const validImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");

@@ -2809,7 +2809,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     function rowsFromTableObjects(json){
       return json.map((row, idx) => {
         const norm={}; Object.entries(row).forEach(([k,v])=> norm[normalizeHeader(String(k))]=v);
-        const id = String(norm.id || idx+1);
+        const id = String(norm.id !== undefined && norm.id !== "" ? norm.id : idx+1);
         return {
           id,
           object: String(norm.object || norm.title || norm.internal || ("Поле " + (idx+1))),
@@ -2817,7 +2817,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
           internal: norm.internal ? String(norm.internal) : undefined,
           metadata: norm.metadata ? String(norm.metadata) : undefined,
           title: norm.title ? String(norm.title) : undefined,
-          parentId: norm.parentId ? String(norm.parentId) : null,
+          parentId: norm.parentId !== undefined && norm.parentId !== "" ? String(norm.parentId) : null,
           level: (norm.level!==undefined && norm.level!=="") ? Number(norm.level) : undefined
         };
       });
