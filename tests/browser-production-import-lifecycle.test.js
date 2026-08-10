@@ -4,6 +4,20 @@ import http from "node:http";
 import { CdpClient, listenServer, closeServer, launchBrowserPage, cleanupAttempt } from "./helpers/browser-launch-layer.mjs";
 
 const marker = "__LOCAL13B_BROWSER_ARRAY_BUFFER_REJECTION__";
+const parserAlertFragment = "Unsupported ZIP file";
+const counterClassification = Object.freeze({
+  attempts: "TEST-SIDE",
+  reads: "DIRECT",
+  controlledErrors: "DIRECT",
+  unhandledRejections: "DIRECT",
+  successfulImports: "INFERRED",
+  parserReached: "INFERRED"
+});
+
+function assertLifecycleCounters(name, actual, expected) {
+  assert.deepEqual(actual, expected, `${name} lifecycle counters must match the real dispatches, reads, controlled errors, and confirmed state transitions.`);
+}
+
 const instrumentationAnchor = "    // init\n    renderTree(); renderSQL();";
 const instrumentation = `    window.__SQLBI_IMPORT_BROWSER_TEST__ = Object.freeze({
       semantic: () => ({
@@ -74,12 +88,13 @@ try {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
     const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-    let reads = 0;
+    let reads = 0, attempts = 0;
+    const alertsBefore = window.__local13bAlerts.length;
     const file = { name: "structure-a-browser.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
     Object.defineProperty(input, "files", { configurable: true, value: [file] });
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+    attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 100));
-    return { hasXlsx: true, byteLength: bytes.byteLength, reads, inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), rejections: window.__local13bRejections.slice() };
+    return { hasXlsx: true, byteLength: bytes.byteLength, reads, attempts, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), rejections: window.__local13bRejections.slice() };
   })()`);
   assert.equal(validImport.hasXlsx, true, "Production page must expose embedded SheetJS.");
   assert.ok(validImport.byteLength > 0, "Browser Structure A XLSX buffer must not be empty.");
@@ -90,18 +105,25 @@ try {
   assert.match(validImport.bodyText, /Field A/, "Browser UI must render Structure A field label.");
   assert.ok(validImport.semantic.rows.some(row => row.internal === "_Document901"), "Runtime state must contain Structure A table ID.");
   assert.ok(validImport.semantic.rows.some(row => row.internal === "_Fld901"), "Runtime state must contain Structure A field ID.");
+  assertLifecycleCounters("Valid A", {
+    attempts: validImport.attempts,
+    reads: validImport.reads,
+    controlledErrors: validImport.alerts.length - validImport.alertsBefore,
+    unhandledRejections: validImport.rejections.length,
+    successfulImports: validImport.semantic.rows.some(row => row.internal === "_Document901") && validImport.semantic.rows.some(row => row.internal === "_Fld901") ? 1 : 0
+  }, { attempts: 1, reads: 1, controlledErrors: 0, unhandledRejections: 0, successfulImports: 1 });
 
   suiteContext.currentPhase = "populated-read-rejection";
   const failedImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");
     const marker = "__LOCAL13C1B2B1_BROWSER_READ_REJECTION__";
-    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() };
-    let reads = 0;
+    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() };
+    let reads = 0, attempts = 0;
     const file = { name: "structure-a-read-rejection.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.reject(new Error(marker)); } };
     Object.defineProperty(input, "files", { configurable: true, value: [file] });
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+    attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 100));
-    return { marker, reads, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() } };
+    return { marker, reads, attempts, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() } };
   })()`);
   assert.equal(failedImport.reads, 1, "Populated browser read-failure file must be read once.");
   assert.equal(failedImport.after.alerts.length, failedImport.before.alerts.length + 1, "Populated read failure must emit exactly one controlled alert.");
@@ -112,17 +134,25 @@ try {
   assert.equal(failedImport.after.sql, failedImport.before.sql, "Generated SQL state must be preserved after read failure.");
   assert.match(failedImport.after.bodyText, /Table A/, "Structure A table label must remain after failed read.");
   assert.match(failedImport.after.bodyText, /Field A/, "Structure A field label must remain after failed read.");
+  assert.deepEqual(failedImport.after.semantic, failedImport.before.semantic, "Failed read must not create an additional runtime state transition.");
+  assertLifecycleCounters("A to read failure", {
+    attempts: validImport.attempts + failedImport.attempts,
+    reads: validImport.reads + failedImport.reads,
+    controlledErrors: failedImport.after.alerts.length - failedImport.before.alerts.length,
+    unhandledRejections: failedImport.after.rejections.length,
+    successfulImports: 1
+  }, { attempts: 2, reads: 2, controlledErrors: 1, unhandledRejections: 0, successfulImports: 1 });
 
   const retryImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx"), XLSX = window.XLSX;
     const ws = XLSX.utils.aoa_to_sheet([["Объекты", "Внутреннее имя", "Тип", "Уровень"], ["Table B", "_Document902", "", 1], ["Field B", "_Fld902", "string", 2]]);
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
     const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-    let reads = 0; const file = { name: "structure-b-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
+    let reads = 0, attempts = 0; const file = { name: "structure-b-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
     const alertsBefore = window.__local13bAlerts.length;
-    Object.defineProperty(input, "files", { configurable: true, value: [file] }); input.dispatchEvent(new Event("change", { bubbles: true }));
+    Object.defineProperty(input, "files", { configurable: true, value: [file] }); attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 100));
-    return { reads, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), rejections: window.__local13bRejections.slice() };
+    return { reads, attempts, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), rejections: window.__local13bRejections.slice() };
   })()`);
   assert.equal(retryImport.reads, 1, "Browser retry Structure B must be read once.");
   assert.equal(retryImport.inputValue, "", "Browser input must reset after Structure B retry.");
@@ -135,35 +165,51 @@ try {
   assert.ok(retryImport.semantic.rows.some(row => row.internal === "_Document902"), "Runtime state must contain Structure B table ID.");
   assert.ok(retryImport.semantic.rows.some(row => row.internal === "_Fld902"), "Runtime state must contain Structure B field ID.");
   assert.ok(!retryImport.semantic.rows.some(row => row.internal === "_Document901" || row.internal === "_Fld901"), "Runtime state must remove Structure A IDs after Structure B import.");
+  assertLifecycleCounters("A to read failure to B", {
+    attempts: validImport.attempts + failedImport.attempts + retryImport.attempts,
+    reads: validImport.reads + failedImport.reads + retryImport.reads,
+    controlledErrors: failedImport.after.alerts.length - failedImport.before.alerts.length + (retryImport.alerts.length - retryImport.alertsBefore),
+    unhandledRejections: retryImport.rejections.length,
+    successfulImports: 2
+  }, { attempts: 3, reads: 3, controlledErrors: 1, unhandledRejections: 0, successfulImports: 2 });
 
   const parserFailure = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");
-    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, alerts: window.__local13bAlerts.slice() };
+    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, alerts: window.__local13bAlerts.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() };
     const bytes = new Uint8Array([80,75,3,4,20,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]).buffer;
-    let reads = 0; const file = { name: "malformed-browser-parser.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
-    Object.defineProperty(input, "files", { configurable: true, value: [file] }); input.dispatchEvent(new Event("change", { bubbles: true }));
+    let reads = 0, attempts = 0; const file = { name: "malformed-browser-parser.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
+    Object.defineProperty(input, "files", { configurable: true, value: [file] }); attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise(resolve => setTimeout(resolve, 100));
-    return { bytes: bytes.byteLength, reads, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() } };
+    return { bytes: bytes.byteLength, reads, attempts, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() } };
   })()`);
   assert.ok(parserFailure.bytes > 0, "Malformed browser parser fixture must have bytes.");
   assert.equal(parserFailure.reads, 1, "Malformed browser parser fixture must be read once.");
   assert.equal(parserFailure.after.alerts.length, parserFailure.before.alerts.length + 1, "Parser failure must emit exactly one controlled alert.");
-  assert.ok(parserFailure.after.alerts.at(-1).length > 0, "Parser controlled alert must contain production parser text.");
+  assert.ok(parserFailure.after.alerts.at(-1).includes(parserAlertFragment), "Parser controlled alert must contain the stable SheetJS parser fragment.");
   assert.deepEqual(parserFailure.after.rejections, [], "Parser failure must not cause unhandled rejections.");
   assert.equal(parserFailure.after.inputValue, "", "Browser input must reset after parser failure.");
   assert.equal(parserFailure.after.bodyText, parserFailure.before.bodyText, "Structure B UI state must be preserved after parser failure.");
   assert.equal(parserFailure.after.sql, parserFailure.before.sql, "SQL state must be preserved after parser failure.");
   assert.match(parserFailure.after.bodyText, /Table B/, "Structure B table label must remain after parser failure.");
   assert.match(parserFailure.after.bodyText, /Field B/, "Structure B field label must remain after parser failure.");
+  assert.deepEqual(parserFailure.after.semantic, parserFailure.before.semantic, "Parser failure must not create an additional runtime state transition.");
+  assertLifecycleCounters("B to parser failure", {
+    attempts: retryImport.attempts + parserFailure.attempts,
+    reads: retryImport.reads + parserFailure.reads,
+    controlledErrors: parserFailure.after.alerts.length - parserFailure.before.alerts.length,
+    unhandledRejections: parserFailure.after.rejections.length,
+    successfulImports: 1,
+    parserReached: parserFailure.reads === 1 && parserFailure.bytes > 0 && parserFailure.after.alerts.at(-1).includes(parserAlertFragment) && parserFailure.after.rejections.length === 0
+  }, { attempts: 2, reads: 2, controlledErrors: 1, unhandledRejections: 0, successfulImports: 1, parserReached: true });
 
   const parserRetry = await evaluate(`(async () => {
     const input = document.getElementById("xlsx"), XLSX = window.XLSX;
     const ws = XLSX.utils.aoa_to_sheet([["Объекты", "Внутреннее имя", "Тип", "Уровень"], ["Table A", "_Document901", "", 1], ["Field A", "_Fld901", "string", 2]]);
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet"); const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-    let reads = 0; const file = { name: "structure-a-parser-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
+    let reads = 0, attempts = 0; const file = { name: "structure-a-parser-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
     const alertsBefore = window.__local13bAlerts.length;
-    Object.defineProperty(input, "files", { configurable: true, value: [file] }); input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
-    return { reads, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, rejections: window.__local13bRejections.slice() };
+    Object.defineProperty(input, "files", { configurable: true, value: [file] }); attempts += 1; input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    return { reads, attempts, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), rejections: window.__local13bRejections.slice() };
   })()`);
   assert.equal(parserRetry.reads, 1, "Parser retry Structure A must be read once.");
   assert.equal(parserRetry.inputValue, "", "Input must reset after parser retry.");
@@ -173,6 +219,16 @@ try {
   assert.match(parserRetry.bodyText, /Field A/, "Parser retry must render Structure A field label.");
   assert.doesNotMatch(parserRetry.bodyText, /Table B/, "Parser retry must remove Structure B table label.");
   assert.doesNotMatch(parserRetry.bodyText, /Field B/, "Parser retry must remove Structure B field label.");
+  assert.ok(parserRetry.semantic.rows.some(row => row.internal === "_Document901" || row.internal === "_Fld901"), "Parser retry must create the expected Structure A runtime transition.");
+  assert.ok(!parserRetry.semantic.rows.some(row => row.internal === "_Document902" || row.internal === "_Fld902"), "Parser retry must remove Structure B runtime IDs.");
+  assertLifecycleCounters("B to parser failure to A", {
+    attempts: retryImport.attempts + parserFailure.attempts + parserRetry.attempts,
+    reads: retryImport.reads + parserFailure.reads + parserRetry.reads,
+    controlledErrors: parserRetry.alerts.length - parserFailure.before.alerts.length,
+    unhandledRejections: parserRetry.rejections.length,
+    successfulImports: 2,
+    parserReached: parserFailure.reads === 1 && parserFailure.bytes > 0 && parserFailure.after.alerts.at(-1).includes(parserAlertFragment) && parserFailure.after.rejections.length === 0
+  }, { attempts: 3, reads: 3, controlledErrors: 1, unhandledRejections: 0, successfulImports: 2, parserReached: true });
 } finally {
   if (attempt) await cleanupAttempt(attempt, suiteContext);
   await closeServer(server, sockets);
