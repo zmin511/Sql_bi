@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { deflateRawSync } from "node:zlib";
 import { loadProductionRuntime } from "./helpers/load-production-runtime.js";
 
 // LOCAL13B expected-red characterization. This invokes the onchange function
@@ -18,6 +19,40 @@ const rejectedFile = {
 };
 input.files = [rejectedFile];
 const snapshot = () => JSON.parse(JSON.stringify(runtime.api.state));
+
+function mxlCell(value) {
+  return '{16,1,{1,1,{"#",' + JSON.stringify(value) + '}},0}';
+}
+
+function validMxlBytes() {
+  const headers = ["Объекты", "Тип", "Список типов", "Уровень", "Полное имя", "Номер картинки", "Метаданные", "Внутреннее имя"];
+  const values = [...headers, "MXL Table", "Строка", "", "0", "MXL Title", "", "metadata", "_DocumentMXL901"];
+  return new TextEncoder().encode(`MOXCEL${values.map(mxlCell).join("")}`);
+}
+
+class ValueStorageDomParser {
+  parseFromString(text) {
+    const match = /^\s*<ValueStorage>([\s\S]*)<\/ValueStorage>\s*$/.exec(String(text));
+    if (!match) return { querySelector: selector => selector === "parsererror" ? {} : null };
+    return {
+      querySelector: () => null,
+      documentElement: {
+        localName: "ValueStorage",
+        textContent: match[1],
+        getAttributeNS: () => null
+      }
+    };
+  }
+}
+
+function validXmlValueStorageBytes() {
+  const scalar = value => `{"S",${JSON.stringify(value)}}`;
+  const values = ["", "XML Table", "Строка", "", "0", "XML Title", "", "metadata", "_DocumentXML901"];
+  const serialized = `{2,1,9,${values.map(scalar).join(",")}}`;
+  const compressed = deflateRawSync(Buffer.from(serialized, "utf8"));
+  const packed = Buffer.concat([Buffer.from([0x02, 0x01, ...Array(16).fill(0)]), compressed]);
+  return new TextEncoder().encode(`<ValueStorage>${packed.toString("base64")}</ValueStorage>`);
+}
 const before = snapshot();
 
 await assert.doesNotReject(
@@ -122,6 +157,44 @@ assert.ok(!labelsAfterB.includes("Field A"), "Structure A field label must be ab
 assert.deepEqual(rootIdsAfterB, [STRUCTURE_B_TABLE_ID], "Structure B must replace the old imported root.");
 assert.equal(changeAttempts, 3, "The test-side real-handler helper must make Structure A, headers-only, and Structure B attempts.");
 assert.deepEqual(new Set(idsAfterB), new Set([STRUCTURE_B_TABLE_ID, STRUCTURE_B_FIELD_ID]), "Final imported IDs must contain Structure B only, without mixed or duplicate rows.");
+
+const mxlRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
+const mxlInput = mxlRuntime.elements.get("xlsx");
+const mxlAlerts = [];
+mxlRuntime.runtime.alert = message => { mxlAlerts.push(String(message)); };
+const mxlBytes = validMxlBytes();
+const mxlFile = { name: "valid-structure.mxl", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(mxlBytes.buffer.slice(mxlBytes.byteOffset, mxlBytes.byteOffset + mxlBytes.byteLength)); } };
+mxlInput.value = mxlFile.name;
+mxlInput.files = [mxlFile];
+await assert.doesNotReject(() => mxlInput.onchange({ target: mxlInput }), "Valid MXL must complete through the production file-import handler.");
+assert.equal(mxlFile.readCount, 1, "Valid MXL must be read once.");
+assert.deepEqual(mxlAlerts, [], "Valid MXL must not emit a controlled error.");
+assert.equal(mxlInput.value, "", "MXL input must reset after valid import.");
+assert.ok(mxlRuntime.api.state.rows.length > 0, "Valid MXL must produce non-empty semantic rows.");
+assert.ok(mxlRuntime.api.state.roots.length > 0, "Valid MXL must produce a root.");
+assert.ok(mxlRuntime.api.state.rows.some(row => row.internal === "_DocumentMXL901"), "Valid MXL must produce its parsed semantic identifier.");
+console.log("ok - structure import accepts valid MXL through production handler");
+
+const xmlRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
+xmlRuntime.runtime.DOMParser = ValueStorageDomParser;
+xmlRuntime.runtime.atob = value => Buffer.from(String(value), "base64").toString("binary");
+xmlRuntime.runtime.DecompressionStream = DecompressionStream;
+xmlRuntime.runtime.Response = Response;
+const xmlInput = xmlRuntime.elements.get("xlsx");
+const xmlAlerts = [];
+xmlRuntime.runtime.alert = message => { xmlAlerts.push(String(message)); };
+const xmlBytes = validXmlValueStorageBytes();
+const xmlFile = { name: "valid-structure.xml", readCount: 0, arrayBuffer() { this.readCount += 1; return Promise.resolve(xmlBytes.buffer.slice(xmlBytes.byteOffset, xmlBytes.byteOffset + xmlBytes.byteLength)); } };
+xmlInput.value = xmlFile.name;
+xmlInput.files = [xmlFile];
+await assert.doesNotReject(() => xmlInput.onchange({ target: xmlInput }), "Valid XML ValueStorage must complete through the production file-import handler.");
+assert.equal(xmlFile.readCount, 1, "Valid XML ValueStorage must be read once.");
+assert.deepEqual(xmlAlerts, [], "Valid XML ValueStorage must not emit a controlled error.");
+assert.equal(xmlInput.value, "", "XML input must reset after valid import.");
+assert.ok(xmlRuntime.api.state.rows.length > 0, "Valid XML ValueStorage must produce non-empty semantic rows.");
+assert.ok(xmlRuntime.api.state.roots.length > 0, "Valid XML ValueStorage must produce a root.");
+assert.ok(xmlRuntime.api.state.rows.some(row => row.internal === "_DocumentXML901"), "Valid XML ValueStorage must produce its parsed semantic identifier.");
+console.log("ok - structure import accepts valid XML ValueStorage through production handler");
 
 const failureRuntime = loadProductionRuntime({ includeEmbeddedSheetJs: true });
 const failureInput = failureRuntime.elements.get("xlsx");
