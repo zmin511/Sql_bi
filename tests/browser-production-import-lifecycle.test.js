@@ -105,6 +105,8 @@ try {
   assert.match(validImport.bodyText, /Field A/, "Browser UI must render Structure A field label.");
   assert.ok(validImport.semantic.rows.some(row => row.internal === "_Document901"), "Runtime state must contain Structure A table ID.");
   assert.ok(validImport.semantic.rows.some(row => row.internal === "_Fld901"), "Runtime state must contain Structure A field ID.");
+  assert.ok(!validImport.semantic.rows.some(row => row.internal === "_Document902"), "Runtime state for valid Structure A must exclude Structure B table ID.");
+  assert.ok(!validImport.semantic.rows.some(row => row.internal === "_Fld902"), "Runtime state for valid Structure A must exclude Structure B field ID.");
   assertLifecycleCounters("Valid A", {
     attempts: validImport.attempts,
     reads: validImport.reads,
