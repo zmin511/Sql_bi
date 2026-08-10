@@ -4534,6 +4534,13 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
         if(!Array.isArray(rows) || rows.length===0){
           throw new Error("Файл не содержит данных структуры.");
         }
+        const seenIds = new Set();
+        for(const row of rows){
+          if(seenIds.has(row.id)){
+            throw new Error("Файл содержит повторяющиеся идентификаторы строк структуры.");
+          }
+          seenIds.add(row.id);
+        }
         importRows(rows);
       } catch(err){
         alert("Не удалось загрузить файл: " + (err && err.message ? err.message : err));

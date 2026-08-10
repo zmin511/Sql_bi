@@ -149,6 +149,27 @@ try {
     successfulImports: 1
   }, { attempts: 2, reads: 2, controlledErrors: 1, unhandledRejections: 0, successfulImports: 1 });
 
+  suiteContext.currentPhase = "duplicate-semantic-ids";
+  const duplicateImport = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const before = { bodyText: document.body.innerText, sql: document.getElementById("sql").value, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), alerts: window.__local13bAlerts.slice() };
+    const ws = XLSX.utils.aoa_to_sheet([["id", "Объекты", "Внутреннее имя", "Тип", "Уровень"], ["dup", "Duplicate 901", "_DocumentDUP901", "", 1], ["dup", "Duplicate 902", "_DocumentDUP902", "", 1]]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet"); const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const parsed = XLSX.utils.sheet_to_json(XLSX.read(bytes, { type: "array" }).Sheets.TDSheet, { defval: "" }); let reads = 0;
+    Object.defineProperty(input, "files", { configurable: true, value: [{ name: "duplicate-browser.xlsx", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } }] }); input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    return { parsed: parsed.length, ids: parsed.map(row => row.id), reads, before, after: { bodyText: document.body.innerText, sql: document.getElementById("sql").value, inputValue: input.value, alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice(), semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic() } };
+  })()`);
+  assert.equal(duplicateImport.parsed, 2, "Duplicate browser XLSX must parse two rows.");
+  assert.deepEqual(duplicateImport.ids, ["dup", "dup"], "Duplicate browser XLSX must preserve explicit IDs.");
+  assert.equal(duplicateImport.reads, 1, "Duplicate browser XLSX must be read once.");
+  assert.equal(duplicateImport.after.alerts.length, duplicateImport.before.alerts.length + 1, "Duplicate browser XLSX must emit one controlled error.");
+  assert.match(duplicateImport.after.alerts.at(-1), /повторяющиеся идентификаторы строк структуры/, "Duplicate browser error must use its semantic fragment.");
+  assert.equal(duplicateImport.after.inputValue, "", "Duplicate browser input must reset.");
+  assert.deepEqual(duplicateImport.after.rejections, [], "Duplicate browser import must not cause unhandled rejections.");
+  assert.deepEqual(duplicateImport.after.semantic, duplicateImport.before.semantic, "Duplicate browser import must preserve Structure A semantic state.");
+  assert.equal(duplicateImport.after.bodyText, duplicateImport.before.bodyText, "Duplicate browser import must preserve rendered Structure A.");
+  assert.equal(duplicateImport.after.sql, duplicateImport.before.sql, "Duplicate browser import must preserve SQL.");
+
   suiteContext.currentPhase = "populated-read-rejection";
   const failedImport = await evaluate(`(async () => {
     const input = document.getElementById("xlsx");
