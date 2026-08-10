@@ -94,6 +94,26 @@ try {
   assert.equal(failedImport.after.sql, failedImport.before.sql, "Generated SQL state must be preserved after read failure.");
   assert.match(failedImport.after.bodyText, /Table A/, "Structure A table label must remain after failed read.");
   assert.match(failedImport.after.bodyText, /Field A/, "Structure A field label must remain after failed read.");
+
+  const retryImport = await evaluate(`(async () => {
+    const input = document.getElementById("xlsx"), XLSX = window.XLSX;
+    const ws = XLSX.utils.aoa_to_sheet([["Объекты", "Внутреннее имя", "Тип", "Уровень"], ["Table B", "_Document902", "", 1], ["Field B", "_Fld902", "string", 2]]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TDSheet");
+    const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    let reads = 0; const file = { name: "structure-b-retry.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } };
+    const alertsBefore = window.__local13bAlerts.length;
+    Object.defineProperty(input, "files", { configurable: true, value: [file] }); input.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return { reads, alertsBefore, alerts: window.__local13bAlerts.slice(), inputValue: input.value, bodyText: document.body.innerText, rejections: window.__local13bRejections.slice() };
+  })()`);
+  assert.equal(retryImport.reads, 1, "Browser retry Structure B must be read once.");
+  assert.equal(retryImport.inputValue, "", "Browser input must reset after Structure B retry.");
+  assert.equal(retryImport.alerts.length, retryImport.alertsBefore, "Valid Structure B retry must not add a controlled alert.");
+  assert.deepEqual(retryImport.rejections, [], "Valid Structure B retry must not cause unhandled rejections.");
+  assert.match(retryImport.bodyText, /Table B/, "Browser UI must render Structure B table label.");
+  assert.match(retryImport.bodyText, /Field B/, "Browser UI must render Structure B field label.");
+  assert.doesNotMatch(retryImport.bodyText, /Table A/, "Browser UI must remove Structure A table label after retry.");
+  assert.doesNotMatch(retryImport.bodyText, /Field A/, "Browser UI must remove Structure A field label after retry.");
 } finally {
   if (attempt) await cleanupAttempt(attempt, suiteContext);
   await closeServer(server, sockets);
