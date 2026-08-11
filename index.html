@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SQL BI 0.2.2</title>
+  <title>SQL BI 0.2.3</title>
   <style>
     :root {
       --bg:#0b1220;
@@ -91,14 +91,20 @@
     .status-error { background:rgba(239,68,68,.2); color:#fecaca; border-color:rgba(239,68,68,.5); }
     .status-selected { background:rgba(96,165,250,.35); color:#e0f2fe; border-color:var(--accent); }
     .query-graph-reset { margin-left:auto; }
-    .query-graph-nodes { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
-    .query-graph-node { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; }
+    .query-graph-nodes { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin:10px 0; }
+    .query-graph-node { display:grid; align-content:start; gap:4px; min-height:100px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); border-left:4px solid var(--accent); background:var(--panel2); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; text-align:left; }
+    .query-graph-node.role-detail { border-left-color:#d97706; } .query-graph-node.role-reference { border-left-color:#059669; }
+    .query-graph-node-alias { font-size:20px; font-weight:700; line-height:1; letter-spacing:.02em; color:var(--text); }
+    .query-graph-node-title { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .query-graph-node-table { color:var(--muted); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .query-graph-node-role { width:max-content; font-size:10px; padding:1px 6px; border:1px solid var(--border); border-radius:999px; color:var(--muted); }
+    .query-graph-node-summary { color:var(--muted); font-size:10px; }
     .query-graph-node:focus { outline:2px solid var(--accent); }
     .query-graph-node.focus { outline:2px solid var(--accent); background:var(--panel3); }
     .query-graph-node.dim { opacity:.35; }
     .query-graph-node.hidden { display:none; }
     .query-graph-edges { display:flex; flex-direction:column; gap:5px; margin-bottom:6px; }
-    .query-graph-edge { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; padding:5px 8px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; text-align:left; }
+    .query-graph-edge { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; padding:7px 10px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; text-align:left; }
     .query-graph-edge:focus { outline:2px solid var(--accent); }
     .query-graph-edge.focus { outline:2px solid var(--accent); background:var(--panel3); }
     .query-graph-edge.dim { opacity:.35; }
@@ -117,7 +123,7 @@
 <div class="topbar">
       <b>SQL BI</b>
       <a href="https://github.com/zmin511/Sql_bi" target="_blank" rel="noopener">GitHub</a>
-      <span>v0.2.2</span>
+      <span>v0.2.3</span>
     </div>
     <div class="col-left">
     <div class="card">
@@ -319,7 +325,7 @@ var o=((a=s[17])==null?void 0:a[0])?Ob(e,e[_b(s[17][0].data)][0]):[];var l=vb(s[
 var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.s.r;c<=n.e.r;++c){i=Ta(c);for(f=n.s.c;f<=n.e.c;++f){r=s[f]+i;t=l?(e[c]||[])[f]:e[r];a="";if(t===undefined)continue;else if(t.F!=null){r=t.F;if(!t.f)continue;a=t.f;if(r.indexOf(":")==-1)r=r+":"+r}if(t.f!=null)a=t.f;else if(t.t=="z")continue;else if(t.t=="n"&&t.v!=null)a=""+t.v;else if(t.t=="b")a=t.v?"TRUE":"FALSE";else if(t.w!==undefined)a="'"+t.w;else if(t.v===undefined)continue;else if(t.t=="s")a="'"+t.v;else a=""+t.v;o[o.length]=r+"="+a}}return o}function xw(e,r,t){var a=t||{};var n=+!a.skipHeader;var i=e||{};var s=0,f=0;if(i&&a.origin!=null){if(typeof a.origin=="number")s=a.origin;else{var o=typeof a.origin=="string"?Oa(a.origin):a.origin;s=o.r;f=o.c}}var l;var c={s:{c:0,r:0},e:{c:f,r:s+r.length-1+n}};if(i["!ref"]){var h=Da(i["!ref"]);c.e.c=Math.max(c.e.c,h.e.c);c.e.r=Math.max(c.e.r,h.e.r);if(s==-1){s=h.e.r+1;c.e.r=s+r.length-1+n}}else{if(s==-1){s=0;c.e.r=r.length-1+n}}var u=a.header||[],d=0;r.forEach(function(e,r){rr(e).forEach(function(t){if((d=u.indexOf(t))==-1)u[d=u.length]=t;var o=e[t];var c="z";var h="";var v=Ra({c:f+d,r:s+r+n});l=Rw(i,v);if(o&&typeof o==="object"&&!(o instanceof Date)){i[v]=o}else{if(typeof o=="number")c="n";else if(typeof o=="boolean")c="b";else if(typeof o=="string")c="s";else if(o instanceof Date){c="d";if(!a.cellDates){c="n";o=fr(o)}h=a.dateNF||X[14]}else if(o===null&&a.nullError){c="e";o=0}if(!l)i[v]=l={t:c,v:o};else{l.t=c;l.v=o;delete l.w;delete l.R;if(h)l.z=h}if(h)l.z=h}})});c.e.c=Math.max(c.e.c,f+u.length-1);var v=Ta(s);if(n)for(d=0;d<u.length;++d)i[ya(d+f)+v]={t:"s",v:u[d]};i["!ref"]=Na(c);return i}function Ow(e,r){return xw(null,e,r)}function Rw(e,r,t){if(typeof r=="string"){if(Array.isArray(e)){var a=Oa(r);if(!e[a.r])e[a.r]=[];return e[a.r][a.c]||(e[a.r][a.c]={t:"z"})}return e[r]||(e[r]={t:"z"})}if(typeof r!="number")return Rw(e,Ra(r));return Rw(e,Ra({r:r,c:t||0}))}function Iw(e,r){if(typeof r=="number"){if(r>=0&&e.SheetNames.length>r)return r;throw new Error("Cannot find sheet # "+r)}else if(typeof r=="string"){var t=e.SheetNames.indexOf(r);if(t>-1)return t;throw new Error("Cannot find sheet name |"+r+"|")}else throw new Error("Cannot find sheet |"+r+"|")}function Nw(){return{SheetNames:[],Sheets:{}}}function Dw(e,r,t,a){var n=1;if(!t)for(;n<=65535;++n,t=undefined)if(e.SheetNames.indexOf(t="Sheet"+n)==-1)break;if(!t||e.SheetNames.length>=65535)throw new Error("Too many worksheets");if(a&&e.SheetNames.indexOf(t)>=0){var i=t.match(/(^.*?)(\d+)$/);n=i&&+i[2]||0;var s=i&&i[1]||t;for(++n;n<=65535;++n)if(e.SheetNames.indexOf(t=s+n)==-1)break}Jp(t);if(e.SheetNames.indexOf(t)>=0)throw new Error("Worksheet with name |"+t+"| already exists!");e.SheetNames.push(t);e.Sheets[t]=r;return t}function Fw(e,r,t){if(!e.Workbook)e.Workbook={};if(!e.Workbook.Sheets)e.Workbook.Sheets=[];var a=Iw(e,r);if(!e.Workbook.Sheets[a])e.Workbook.Sheets[a]={};switch(t){case 0:;case 1:;case 2:break;default:throw new Error("Bad sheet visibility setting "+t);}e.Workbook.Sheets[a].Hidden=t}function Pw(e,r){e.z=r;return e}function Lw(e,r,t){if(!r){delete e.l}else{e.l={Target:r};if(t)e.l.Tooltip=t}return e}function Mw(e,r,t){return Lw(e,"#"+r,t)}function Uw(e,r,t){if(!e.c)e.c=[];e.c.push({t:r,a:t||"SheetJS"})}function Bw(e,r,t,a){var n=typeof r!="string"?r:Da(r);var i=typeof r=="string"?r:Na(r);for(var s=n.s.r;s<=n.e.r;++s)for(var f=n.s.c;f<=n.e.c;++f){var o=Rw(e,s,f);o.t="n";o.F=i;delete o.v;if(s==n.s.r&&f==n.s.c){o.f=t;if(a)o.D=true}}return e}var Ww={encode_col:ya,encode_row:Ta,encode_cell:Ra,encode_range:Na,decode_col:Ca,decode_row:ka,split_cell:xa,decode_cell:Oa,decode_range:Ia,format_cell:Pa,sheet_add_aoa:Ma,sheet_add_json:xw,sheet_add_dom:Gm,aoa_to_sheet:Ua,json_to_sheet:Ow,table_to_sheet:jm,table_to_book:Xm,sheet_to_csv:yw,sheet_to_txt:Sw,sheet_to_json:Aw,sheet_to_html:Vm,sheet_to_formulae:_w,sheet_to_row_object_array:Aw,sheet_get_cell:Rw,book_new:Nw,book_append_sheet:Dw,book_set_sheet_visibility:Fw,cell_set_number_format:Pw,cell_set_hyperlink:Lw,cell_set_internal_link:Mw,cell_add_comment:Uw,sheet_set_array_formula:Bw,consts:{SHEET_VISIBLE:0,SHEET_HIDDEN:1,SHEET_VERY_HIDDEN:2}};var Hw;function zw(e){Hw=e}function Vw(e,r){var t=Hw();var a=r==null?{}:r;if(e==null||e["!ref"]==null){t.push(null);return t}var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=n.s.r;var g=false,m=0;t._read=function(){if(!g){g=true;return t.push("\ufeff")}while(p<=n.e.r){++p;if((d[p-1]||{}).hidden)continue;c=Cw(e,n,p-1,h,s,o,i,a);if(c!=null){if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)return t.push((m++?f:"")+c)}}return t.push(null)};return t}function Gw(e,r){var t=Hw();var a=r||{};var n=a.header!=null?a.header:Bm;var i=a.footer!=null?a.footer:Wm;t.push(n);var s=Ia(e["!ref"]);a.dense=Array.isArray(e);t.push(zm(e,s,a));var f=s.s.r;var o=false;t._read=function(){if(f>s.e.r){if(!o){o=true;t.push("</table>"+i)}return t.push(null)}while(f<=s.e.r){t.push(Um(e,s,f,a));++f;break}};return t}function jw(e,r){var t=Hw({objectMode:true});if(e==null||e["!ref"]==null){t.push(null);return t}var a={t:"n",v:0},n=0,i=1,s=[],f=0,o="";var l={s:{r:0,c:0},e:{r:0,c:0}};var c=r||{};var h=c.range!=null?c.range:e["!ref"];if(c.header===1)n=1;else if(c.header==="A")n=2;else if(Array.isArray(c.header))n=3;switch(typeof h){case"string":l=Da(h);break;case"number":l=Da(e["!ref"]);l.s.r=h;break;default:l=h;}if(n>0)i=0;var u=Ta(l.s.r);var d=[];var v=0;var p=Array.isArray(e);var g=l.s.r,m=0;var b={};if(p&&!e[g])e[g]=[];var w=c.skipHidden&&e["!cols"]||[];var k=c.skipHidden&&e["!rows"]||[];for(m=l.s.c;m<=l.e.c;++m){if((w[m]||{}).hidden)continue;d[m]=ya(m);a=p?e[g][m]:e[d[m]+u];switch(n){case 1:s[m]=m-l.s.c;break;case 2:s[m]=d[m];break;case 3:s[m]=c.header[m-l.s.c];break;default:if(a==null)a={w:"__EMPTY",t:"s"};o=f=Pa(a,null,c);v=b[f]||0;if(!v)b[f]=1;else{do{o=f+"_"+v++}while(b[o]);b[f]=v;b[o]=1}s[m]=o;}}g=l.s.r+i;t._read=function(){while(g<=l.e.r){if((k[g-1]||{}).hidden)continue;var r=Tw(e,l,g,d,n,s,p,c);++g;if(r.isempty===false||(n===1?c.blankrows!==false:!!c.blankrows)){t.push(r.row);return}}return t.push(null)};return t}var Xw={to_json:jw,to_html:Gw,to_csv:Vw,set_readable:zw};if(typeof vm!=="undefined")e.parse_xlscfb=vm;e.parse_zip=Xb;e.read=iw;e.readFile=sw;e.readFileSync=sw;e.write=gw;e.writeFile=bw;e.writeFileSync=bw;e.writeFileAsync=kw;e.utils=Ww;e.writeXLSX=pw;e.writeFileXLSX=ww;e.SSF=Ve;if(typeof Xw!=="undefined")e.stream=Xw;if(typeof Ke!=="undefined")e.CFB=Ke;if(typeof require!=="undefined"){var $w=undefined;if(($w||{}).Readable)zw($w.Readable)}}if(typeof exports!=="undefined")make_xlsx_lib(exports);else if(typeof module!=="undefined"&&module.exports)make_xlsx_lib(module.exports);else if(typeof define==="function"&&define.amd)define("xlsx",function(){if(!XLSX.version)make_xlsx_lib(XLSX);return XLSX});else make_xlsx_lib(XLSX);if(typeof window!=="undefined"&&!window.XLSX)try{window.XLSX=XLSX}catch(e){}
 <!-- BEGIN GENERATED CANONICAL CORE -->
 /* Generated from canonical src/core modules. Do not edit manually. */
-/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/filters.js","sha256":"609def99b24ad2f701f6a5b47d0fc613cea99a4fb7db5e74dd7e70b439d58e75"},{"file":"src/core/queryPlan.js","sha256":"403b495488611fba243c676505e3af911da46ef398d304924e78f2e6ae614183"},{"file":"src/core/queryPlanView.js","sha256":"f30b0d96c715487b60f8353b0083c2c833568a045a0056f3ca98fe351bf144ac"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"d087abfaa348e3a70b558fcd1a877cade72ec62b1b481c37cdc4ea1195d813c6"}],"payloadSha256":"73ed211a3762f4158e9d90b7e894417f6b7ffebccb984b110d1f1d691f3d54b9"} */
+/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/filters.js","sha256":"609def99b24ad2f701f6a5b47d0fc613cea99a4fb7db5e74dd7e70b439d58e75"},{"file":"src/core/queryPlan.js","sha256":"05c0901b5c7d32e03ea219b966a243d7e9f0c0f69b27f7116f4660debfcfce41"},{"file":"src/core/queryPlanView.js","sha256":"5c98b57dffb1c030d0fca297ed87dca28af45fdf62f31fd93ce54084a8dad0ce"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"d087abfaa348e3a70b558fcd1a877cade72ec62b1b481c37cdc4ea1195d813c6"}],"payloadSha256":"837acfad87180e30623b1bc9a0a7816a5b6a1a8b2a2ca16c209cebe6534c51df"} */
 (function(){
 // src/core/sqlIdentifiers.js
 function quoteIdentifier(value) {
@@ -2444,7 +2450,9 @@ function buildQueryPlan(input = {}) {
     const outputAlias = makeUniqueColumnAlias(outputAliasBase(field, meta ? meta.displayPath : ""), usedAliases);
     if (!outputAlias) { diagnostics.push("Поле пропущено: невозможно сформировать выходной alias."); return; }
     const projectionSourceTable = meta && meta.chain.length ? meta.chain.at(-1).targetTable : sourceTable;
-    selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
+    const sourceTableRow = tableFor(sourceRow || row, byId);
+    const projectionTableRow = (rows || []).find(candidate => String(candidate.internal || "").toLowerCase() === String(projectionSourceTable || "").toLowerCase());
+    selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceTitle: projectionTableRow && (projectionTableRow.title || projectionTableRow.object) || sourceTableRow && (sourceTableRow.title || sourceTableRow.object) || projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
   };
   original.forEach(row => addSelection(row.id, "orig", row, null, row));
   synthetic.forEach(meta => { const source = byId[meta.baseTopId]; if (source) addSelection(meta.id, "synth", null, meta, source); });
@@ -2490,13 +2498,13 @@ function buildQueryPlanView(plan) {
   const nodes = new Map();
   const ensure = (alias, table) => {
     if (!alias) return null;
-    if (!nodes.has(alias)) nodes.set(alias, { id: nodeId(alias), alias, table: table || "", role: roleForAlias(alias), fields: [], filters: [] });
+    if (!nodes.has(alias)) nodes.set(alias, { id: nodeId(alias), alias, table: table || "", title: "", role: roleForAlias(alias), fields: [], filters: [] });
     const node = nodes.get(alias); if (!node.table && table) node.table = table;
     return node;
   };
   for (const selection of plan.selections || []) {
     const node = ensure(selection.sourceAlias, selection.sourceTable);
-    if (node) node.fields.push({ id: selection.id, field: selection.sourceField, label: selection.outputAlias || selection.sourceField, expression: selection.expression });
+    if (node) { node.title = node.title || selection.sourceTitle || ""; node.fields.push({ id: selection.id, field: selection.sourceField, label: selection.field && (selection.field.title || selection.field.object) || selection.outputAlias || selection.sourceField, outputAlias: selection.outputAlias || "", expression: selection.expression }); }
   }
   const edges = [];
   for (const join of plan.joins || []) {
@@ -2507,7 +2515,7 @@ function buildQueryPlanView(plan) {
   for (const filter of plan.filters || []) {
     const selection = (plan.selections || []).find(item => item.id === filter.fieldId || item.selectionId === filter.fieldId);
     const node = selection && ensure(selection.sourceAlias, selection.sourceTable);
-    if (node) node.filters.push({ id: filter.id, field: selection.sourceField, operator: filter.operator, expression: filter.expression || "" });
+    if (node) node.filters.push({ id: filter.id, field: selection.sourceField, label: selection.field && (selection.field.title || selection.field.object) || selection.sourceField, operator: filter.operator, expression: filter.expression || "" });
   }
   const ordered = [...nodes.values()].sort((a, b) => aliasOrder(a.alias) - aliasOrder(b.alias) || a.alias.localeCompare(b.alias));
   for (const node of ordered) { node.fields.sort((a, b) => a.label.localeCompare(b.label)); node.filters.sort((a, b) => a.id.localeCompare(b.id)); }
@@ -4183,7 +4191,9 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
       if(status === "normal" || status === "active") return "available";
       return "unknown";
     }
-    function nodeLabel(node){ return node ? (node.label || node.table || node.id || "—") : "—"; }
+    function nodeLabel(node){ return node ? (node.label || node.title || node.table || node.id || "—") : "—"; }
+    function queryRoleLabel(role){ return ({header:"Документ",detail:"Табличная часть",reference:"Справочник",base:"Таблица"})[role] || role || "Таблица"; }
+    function compactQueryEdgeLabel(edge){ return edge && edge.queryEdge ? `${edge.queryEdge.sourceColumn} → ${edge.queryEdge.targetColumn}` : edgeLabel(edge); }
     function edgeKindLabel(kind){ if(kind === "tree") return "Структурная"; if(kind === "header_detail") return "Шапка–табличная часть"; if(kind === "reference") return "Справочник"; return kind || "Связь"; }
     function edgeSourceTarget(edge, model){ if(!edge || !model) return {source:"—",target:"—"}; const s=model.nodes.find(n=>n.id===edge.sourceId); const t=model.nodes.find(n=>n.id===edge.targetId); return {source: s?nodeLabel(s):edge.sourceId, target: t?nodeLabel(t):edge.targetId}; }
     function edgeLabel(edge){ if(!edge) return ""; if(edge.queryEdge) return edge.label || ""; if(edge.reason) return edge.reason; if(edge.confirmation) return edge.confirmation; return edge.label || ""; }
@@ -4210,8 +4220,8 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
         if(item.selected) lines.push({label:"Выбрано", value:"да"});
         if(item.depth !== undefined && item.depth !== null) lines.push({label:"Глубина", value:String(item.depth)});
       }
-      if(item.queryNode){ lines.push({label:"Alias",value:item.queryNode.alias}); lines.push({label:"Role",value:item.queryNode.role}); lines.push({label:"Projected fields",value:item.queryNode.fields.map(field=>field.expression).join("; ")||"—"}); lines.push({label:"Filters",value:item.queryNode.filters.map(filter=>filter.expression).join("; ")||"—"}); }
-      if(item.queryEdge){ lines.push({label:"Source",value:`${item.queryEdge.sourceAlias}.${item.queryEdge.sourceColumn}`}); lines.push({label:"Target",value:`${item.queryEdge.targetAlias}.${item.queryEdge.targetColumn}`}); lines.push({label:"ON",value:item.queryEdge.sql}); }
+      if(item.queryNode){ lines.push({label:"Alias",value:item.queryNode.alias}); lines.push({label:"Объект",value:item.queryNode.title||item.queryNode.table}); lines.push({label:"Физическая таблица",value:item.queryNode.table}); lines.push({label:"Роль",value:queryRoleLabel(item.queryNode.role)}); lines.push({label:"Выбранные поля",value:item.queryNode.fields.map(field=>`${field.label}: ${field.expression}${field.outputAlias?` AS ${field.outputAlias}`:""}`).join("; ")||"—"}); lines.push({label:"Фильтры",value:item.queryNode.filters.map(filter=>filter.expression||`${filter.label} ${filter.operator}`).join("; ")||"—"}); }
+      if(item.queryEdge){ lines.push({label:"JOIN",value:`${item.queryEdge.sourceAlias} → ${item.queryEdge.targetAlias}`}); lines.push({label:"Тип",value:item.queryEdge.sql.startsWith("LEFT JOIN")?"LEFT JOIN":edgeKindLabel(item.queryEdge.kind)}); lines.push({label:"Source",value:`${item.queryEdge.sourceAlias}.${item.queryEdge.sourceColumn}`}); lines.push({label:"Target",value:`${item.queryEdge.targetAlias}.${item.queryEdge.targetColumn}`}); lines.push({label:"ON",value:item.queryEdge.sql}); }
       return lines;
     }
     function setQueryGraphFocus(kind, id){ state.queryGraphFocus = {kind:kind || null, id:id || null}; renderQueryGraph(); }
@@ -4250,9 +4260,10 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
       host.innerHTML = `<div class="query-graph-nodes" role="list" aria-label="Узлы связей">${model.nodes.map(node => {
         const visible = visibleNodeIds.has(node.id);
         const status = normalizeRelationshipStatus(node, model);
-        const label = nodeLabel(node);
+        const label = nodeLabel(node), queryNode=node.queryNode;
+        const classes = ["query-graph-node", queryNode ? `role-${queryNode.role}` : "", `status-${status}`, visible ? "" : "hidden", isFocus(node.id) ? "focus" : "", isDim(node.id) ? "dim" : ""].filter(Boolean).join(" ");
+        if(queryNode) return `<button type="button" class="${classes}" role="listitem" data-node-id="${escapeHtml(node.id)}" title="${escapeHtml(`${queryNode.alias} · ${queryNode.title||queryNode.table}`)}" aria-label="${escapeHtml(`${queryNode.alias} ${queryNode.title||queryNode.table} ${queryRoleLabel(queryNode.role)}`)}" tabindex="0"><span class="query-graph-node-alias">${escapeHtml(queryNode.alias)}</span><span class="query-graph-node-title">${escapeHtml(queryNode.title||queryNode.table)}</span><span class="query-graph-node-table">${escapeHtml(queryNode.table)}</span><span class="query-graph-node-role">${escapeHtml(queryRoleLabel(queryNode.role))}</span><span class="query-graph-node-summary">Поля: ${queryNode.fields.length} · Фильтры: ${queryNode.filters.length}</span></button>`;
         const shortLabel = label.length > maxLen ? label.slice(0, maxLen-1) + "…" : label;
-        const classes = ["query-graph-node", `status-${status}`, visible ? "" : "hidden", isFocus(node.id) ? "focus" : "", isDim(node.id) ? "dim" : ""].filter(Boolean).join(" ");
         return `<button type="button" class="${classes}" role="listitem" data-node-id="${escapeHtml(node.id)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(node.kind || "узел")} ${escapeHtml(label)} ${escapeHtml(relationshipStatusLabel(status))}" tabindex="0">${escapeHtml(shortLabel)}</button>`;
       }).join("")}</div>`;
     }
@@ -4269,7 +4280,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
         const classes = ["query-graph-edge", `status-${status}`, isFocus(edge.id) ? "focus" : "", isDim(edge.id) ? "dim" : ""].filter(Boolean).join(" ");
         return `<button type="button" class="${classes}" role="listitem" data-edge-id="${escapeHtml(edge.id)}" aria-label="${escapeHtml(edgeKindLabel(edge.kind))} ${escapeHtml(relationshipStatusLabel(status))}" tabindex="0">
           <span class="query-graph-status status-${status}">${escapeHtml(relationshipStatusLabel(status))}</span>
-          <span class="query-graph-edge-meta">${escapeHtml(st.source)} &rarr; ${escapeHtml(st.target)}${label ? ` &bull; ${escapeHtml(label)}` : ""}</span>
+          <span class="query-graph-edge-meta">${escapeHtml(edge.queryEdge ? `${edge.queryEdge.sourceAlias} → ${edge.queryEdge.targetAlias} · ${compactQueryEdgeLabel(edge)}` : `${st.source} → ${st.target}${label ? ` • ${label}` : ""}`)}</span>
           <span class="query-graph-edge-kind muted">${escapeHtml(edgeKindLabel(edge.kind))}</span>
         </button>`;
       }).join("")}</div>` : "";
@@ -4319,7 +4330,8 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
       renderQueryGraphNodes(model, visibleNodeIds, focusedKind === "node" ? focusedId : null, dimIds);
       renderQueryGraphEdges(model, visibleEdges, focusedKind === "edge" ? focusedId : null, dimIds);
       renderQueryGraphDetails(model);
-      $("queryGraphNodeCount").textContent = `Узлов: ${model.nodes.length}`;
+      const queryNodes=model.nodes.filter(node=>node.queryNode), fieldCount=queryNodes.reduce((sum,node)=>sum+node.queryNode.fields.length,0), filterCount=queryNodes.reduce((sum,node)=>sum+node.queryNode.filters.length,0);
+      $("queryGraphNodeCount").textContent = state.queryGraphScope==="query" ? `Таблиц: ${model.nodes.length}${fieldCount?` · Полей: ${fieldCount}`:""}${filterCount?` · Фильтров: ${filterCount}`:""}` : `Узлов: ${model.nodes.length}`;
       $("queryGraphEdgeCount").textContent = `Связей: ${visibleEdges.length}`;
       const reset = $("queryGraphResetFocus");
       if(reset) reset.style.display = focusedId ? "inline-block" : "none";
@@ -4424,7 +4436,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
       renderTree(); renderSQL();
     };
     $("relationMode").onchange = (e)=>{ state.relationMode = e.target.value; renderSQL(); };
-    function buildCurrentQueryGraphModel(plan){const core=window.SQLBICanonicalCore,view=core&&typeof core.buildQueryPlanView==="function"?core.buildQueryPlanView(plan):{status:"blocked",reason:"query_plan_view_unavailable",nodes:[],edges:[],diagnostics:[]};return {status:view.status,reason:view.reason,nodes:(view.nodes||[]).map(node=>({id:node.id,kind:"query_table",table:node.table,label:`${node.alias} · ${node.table}`,status:"sql",selected:true,depth:0,queryNode:node})),edges:(view.edges||[]).map(edge=>({id:edge.id,kind:edge.kind,sourceId:edge.sourceId,targetId:edge.targetId,status:"sql",confirmation:edge.confirmation,joinId:edge.joinId,label:edge.sql,queryEdge:edge})),activeNodeIds:(view.nodes||[]).map(node=>node.id),activeEdgeIds:(view.edges||[]).map(edge=>edge.id),diagnostics:view.diagnostics||[]};}
+    function buildCurrentQueryGraphModel(plan){const core=window.SQLBICanonicalCore,view=core&&typeof core.buildQueryPlanView==="function"?core.buildQueryPlanView(plan):{status:"blocked",reason:"query_plan_view_unavailable",nodes:[],edges:[],diagnostics:[]};return {status:view.status,reason:view.reason,nodes:(view.nodes||[]).map(node=>({id:node.id,kind:"query_table",table:node.table,label:node.alias,title:node.title,status:"sql",selected:true,depth:0,queryNode:node})),edges:(view.edges||[]).map(edge=>({id:edge.id,kind:edge.kind,sourceId:edge.sourceId,targetId:edge.targetId,status:"sql",confirmation:edge.confirmation,joinId:edge.joinId,label:edge.sql,queryEdge:edge})),activeNodeIds:(view.nodes||[]).map(node=>node.id),activeEdgeIds:(view.edges||[]).map(edge=>edge.id),diagnostics:view.diagnostics||[]};}
     $("queryGraphFilter").onchange = e=>{ state.queryGraph.graphFilter=requireCanonicalProjectApi().normalizeVisualizationSettings({graphFilter:e.target.value,viewMode:state.queryGraph.viewMode}).graphFilter; renderQueryGraph(); };
     $("queryGraphScope").onchange = e=>{ state.queryGraphScope=e.target.value==="all"?"all":"query"; renderQueryGraph(); };
     $("structureViewMode").onchange = e=>{ state.queryGraph.viewMode=requireCanonicalProjectApi().normalizeVisualizationSettings({viewMode:e.target.value,graphFilter:state.queryGraph.graphFilter}).viewMode; const graph=$("queryGraphPanel"),tree=$("tree"); graph.style.display=state.queryGraph.viewMode==="tree"?"none":"block"; tree.style.display=state.queryGraph.viewMode==="graph"?"none":"block"; renderQueryGraph(); };

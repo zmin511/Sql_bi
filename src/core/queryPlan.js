@@ -142,7 +142,9 @@ export function buildQueryPlan(input = {}) {
     const outputAlias = makeUniqueColumnAlias(outputAliasBase(field, meta ? meta.displayPath : ""), usedAliases);
     if (!outputAlias) { diagnostics.push("Поле пропущено: невозможно сформировать выходной alias."); return; }
     const projectionSourceTable = meta && meta.chain.length ? meta.chain.at(-1).targetTable : sourceTable;
-    selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
+    const sourceTableRow = tableFor(sourceRow || row, byId);
+    const projectionTableRow = (rows || []).find(candidate => String(candidate.internal || "").toLowerCase() === String(projectionSourceTable || "").toLowerCase());
+    selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceTitle: projectionTableRow && (projectionTableRow.title || projectionTableRow.object) || sourceTableRow && (sourceTableRow.title || sourceTableRow.object) || projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
   };
   original.forEach(row => addSelection(row.id, "orig", row, null, row));
   synthetic.forEach(meta => { const source = byId[meta.baseTopId]; if (source) addSelection(meta.id, "synth", null, meta, source); });

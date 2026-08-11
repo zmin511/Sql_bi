@@ -16,13 +16,13 @@ export function buildQueryPlanView(plan) {
   const nodes = new Map();
   const ensure = (alias, table) => {
     if (!alias) return null;
-    if (!nodes.has(alias)) nodes.set(alias, { id: nodeId(alias), alias, table: table || "", role: roleForAlias(alias), fields: [], filters: [] });
+    if (!nodes.has(alias)) nodes.set(alias, { id: nodeId(alias), alias, table: table || "", title: "", role: roleForAlias(alias), fields: [], filters: [] });
     const node = nodes.get(alias); if (!node.table && table) node.table = table;
     return node;
   };
   for (const selection of plan.selections || []) {
     const node = ensure(selection.sourceAlias, selection.sourceTable);
-    if (node) node.fields.push({ id: selection.id, field: selection.sourceField, label: selection.outputAlias || selection.sourceField, expression: selection.expression });
+    if (node) { node.title = node.title || selection.sourceTitle || ""; node.fields.push({ id: selection.id, field: selection.sourceField, label: selection.field && (selection.field.title || selection.field.object) || selection.outputAlias || selection.sourceField, outputAlias: selection.outputAlias || "", expression: selection.expression }); }
   }
   const edges = [];
   for (const join of plan.joins || []) {
@@ -33,7 +33,7 @@ export function buildQueryPlanView(plan) {
   for (const filter of plan.filters || []) {
     const selection = (plan.selections || []).find(item => item.id === filter.fieldId || item.selectionId === filter.fieldId);
     const node = selection && ensure(selection.sourceAlias, selection.sourceTable);
-    if (node) node.filters.push({ id: filter.id, field: selection.sourceField, operator: filter.operator, expression: filter.expression || "" });
+    if (node) node.filters.push({ id: filter.id, field: selection.sourceField, label: selection.field && (selection.field.title || selection.field.object) || selection.sourceField, operator: filter.operator, expression: filter.expression || "" });
   }
   const ordered = [...nodes.values()].sort((a, b) => aliasOrder(a.alias) - aliasOrder(b.alias) || a.alias.localeCompare(b.alias));
   for (const node of ordered) { node.fields.sort((a, b) => a.label.localeCompare(b.label)); node.filters.sort((a, b) => a.id.localeCompare(b.id)); }

@@ -277,7 +277,7 @@ async function waitForRenderedProject(client, expected, timeout = TIMEOUTS.fixtu
     const edgeText=document.getElementById('queryGraphEdgeCount')?.textContent || '';
     const sql=document.getElementById('sql')?.value || '';
     const pending=document.querySelector('[data-render-pending="true"],.query-graph-loading');
-    return nodeText===${JSON.stringify(`Узлов: ${expected.nodes}`)} &&
+    return (nodeText===${JSON.stringify(`Узлов: ${expected.nodes}`)} || nodeText.startsWith(${JSON.stringify(`Таблиц: ${expected.nodes}`)})) &&
       (!${Number.isInteger(expected.edges)} || edgeText===${JSON.stringify(`Связей: ${expected.edges}`)}) &&
       semantic.queryPlan && ['ready','error'].includes(semantic.queryPlan.status) &&
       sql.length>0 && !pending;
@@ -587,7 +587,9 @@ async function runBrowserWorkflow() {
   const queryEdgeDetails = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
   test("query scope is the explicit default query-plan mode", () => assert.equal(queryGraph.scope, "query"));
   test("query graph exposes only canonical H T R1 alias participants", () => { assert.deepEqual(queryGraph.nodes.map(node=>node.id), ["alias:H","alias:T","alias:R1"]); assert.ok(queryGraph.nodes.every(node=>!node.id.startsWith("row:"))); });
+  test("query graph nodes present aliases, human names, physical tables, roles, and compact summaries", () => { const text=queryGraph.nodes.map(node=>node.text).join(" "); assert.match(text,/H/); assert.match(text,/T/); assert.match(text,/R1/); assert.match(text,/Order/); assert.match(text,/Items/); assert.match(text,/_Document100/); assert.match(text,/_Document100_VT1/); assert.match(text,/_Reference1002/); assert.match(text,/Документ|Табличная часть|Справочник/); assert.match(text,/Поля:/); });
   test("query graph exposes canonical header/detail and reference SQL edges", () => { assert.equal(queryGraph.edges.length, 2); assert.ok(queryGraph.edges.some(edge=>edge.text.includes("_Document100_IDRRef"))); assert.ok(queryGraph.edges.some(edge=>edge.text.includes("_Fld100011RRef"))); });
+  test("query graph edges keep directional aliases and compact physical-column labels", () => { const text=queryGraph.edges.map(edge=>edge.text).join(" "); assert.match(text,/T → H/); assert.match(text,/T → R1/); assert.match(text,/_Document100_IDRRef → _IDRRef/); assert.match(text,/_Fld100011RRef → _IDRRef/); });
   test("reference alias node focus exposes projected field details", () => assert.match(queryNodeDetails, /R1|_Description/));
   test("query edge focus exposes physical join details", () => assert.match(queryEdgeDetails, /_Document100_IDRRef|header_detail/));
   console.log("Browser performance characterization (in-page elapsed includes production event/render; round-trip includes CDP):");

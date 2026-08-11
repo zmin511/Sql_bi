@@ -1,4 +1,10 @@
 # Changelog
+## 0.2.3 - 2026-08-11
+
+### Added and changed
+- The current-query graph now presents canonical aliases as the primary node identifier, with human object names, physical tables, semantic roles, compact field/filter counts, and readable physical JOIN-column labels.
+- Focus details retain canonical SQL while adding structured alias, object, role, selected-field, and filter context.
+
 ## 0.2.2 - 2026-07-30
 
 ### Added and changed
