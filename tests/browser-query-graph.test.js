@@ -184,8 +184,10 @@ function largeSnapshot() {
       rows.push({ id: `field-${table}-${field}`, object: relationshipKey ? "OrderRef" : detailReference ? "CatalogRef" : `Field ${table + 1}.${field + 1}`, title: relationshipKey ? "OrderRef" : detailReference ? "CatalogRef" : `Field ${table + 1}.${field + 1}`, internal: headerKey ? "_IDRRef" : detailForeignKey ? "_Document100_IDRRef" : detailReference ? "_Fld100011RRef" : `_Fld${100000 + table * 10 + field}`, type: relationshipKey ? "UUID" : detailReference ? "Reference.Object3" : field === 0 ? "Number(15,2)" : "String", parentId: root });
     }
   }
+  rows.find(row => row.id === "field-1-1").type = "Справочник.Object3";
+  rows.find(row => row.id === "table-2").type = "Справочник.Object3";
   const syntheticId = "s:field-1-1:1:_Reference1002:_Description";
-  const projectState = state(rows, { "field-0-0": true, "field-1-0": true, [syntheticId]: true });
+  const projectState = state(rows, { "field-0-0": true, "field-1-0": true, "field-1-1": true, [syntheticId]: true });
   projectState.flatten = { "_document100_vt1": true };
   projectState.metaById[syntheticId] = {
     id: syntheticId,
@@ -583,6 +585,10 @@ async function runBrowserWorkflow() {
   const queryGraph = await evaluate(client, `({scope:document.getElementById("queryGraphScope").value,nodes:Array.from(document.querySelectorAll("#queryGraphNodes [data-node-id]")).map(node=>({id:node.dataset.nodeId,text:node.textContent})),edges:Array.from(document.querySelectorAll("#queryGraphNodes [data-edge-id]")).map(edge=>({id:edge.dataset.edgeId,text:edge.textContent})),details:document.getElementById("queryGraphDetails").textContent,empty:document.getElementById("queryGraphEmpty").textContent})`);
   await pointerClick(client, '#queryGraphNodes [data-node-id="alias:R1"]');
   const queryNodeDetails = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
+  await pointerClick(client, '#queryGraphNodes [data-node-id="alias:T"]');
+  const relatedBefore = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
+  await pointerClick(client, '[data-relation-id="reference:field-1-1:_Reference1002"][data-field-internal="_Code"]');
+  const relatedAfter = await evaluate(client, semanticExpression);
   await pointerClick(client, '#queryGraphNodes [data-edge-id^="join:header_detail:"]');
   const queryEdgeDetails = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
   test("query scope is the explicit default query-plan mode", () => assert.equal(queryGraph.scope, "query"));
@@ -591,6 +597,7 @@ async function runBrowserWorkflow() {
   test("query graph exposes canonical header/detail and reference SQL edges", () => { assert.equal(queryGraph.edges.length, 2); assert.ok(queryGraph.edges.some(edge=>edge.text.includes("_Document100_IDRRef"))); assert.ok(queryGraph.edges.some(edge=>edge.text.includes("_Fld100011RRef"))); });
   test("query graph edges keep directional aliases and compact physical-column labels", () => { const text=queryGraph.edges.map(edge=>edge.text).join(" "); assert.match(text,/T → H/); assert.match(text,/T → R1/); assert.match(text,/_Document100_IDRRef → _IDRRef/); assert.match(text,/_Fld100011RRef → _IDRRef/); });
   test("reference alias node focus exposes projected field details", () => assert.match(queryNodeDetails, /R1|_Description/));
+  test("query node exposes confirmed related data and adds one field through canonical selection", () => { assert.match(relatedBefore,/Доступные связанные данные/); assert.ok(relatedAfter.selectedIds.includes("s:field-1-1:1:_Reference1002:_Code")); assert.match(relatedAfter.sql,/R1\.\[_Code\]/); assert.equal((relatedAfter.sql.match(/LEFT JOIN \[SQLBI\]\.\[dbo\]\.\[_Reference1002\] AS R1/g)||[]).length,1); });
   test("query edge focus exposes physical join details", () => assert.match(queryEdgeDetails, /_Document100_IDRRef|header_detail/));
   console.log("Browser performance characterization (in-page elapsed includes production event/render; round-trip includes CDP):");
   console.table(performanceRows);
