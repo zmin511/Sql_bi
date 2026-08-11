@@ -7,9 +7,12 @@ import { CdpClient, listenServer, closeServer, launchBrowserPage, cleanupAttempt
 
 const root = new URL("../", import.meta.url);
 const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const unhandledInstrumentation = `<script>window.__sqlbiUnhandledRejections=[];window.addEventListener("unhandledrejection",event=>{window.__sqlbiUnhandledRejections.push(String(event.reason&&(event.reason.stack||event.reason.message||event.reason)));});</script>`;
+const servedHtml = html.replace("</head>", `${unhandledInstrumentation}</head>`);
+if (servedHtml === html) throw new Error("Unhandled-rejection instrumentation anchor is missing");
 const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), "sql-bi-typed-filters-"));
 const app = http.createServer((request, response) => {
-  if (request.url === "/" || request.url === "/index.html") { response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); response.end(html); }
+  if (request.url === "/" || request.url === "/index.html") { response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); response.end(servedHtml); }
   else { response.writeHead(404); response.end(); }
 });
 const sockets = new Set(); app.on("connection", socket => { sockets.add(socket); socket.once("close", () => sockets.delete(socket)); });
@@ -31,6 +34,7 @@ try {
   const client = attempt.pageClient; context.browserPid = attempt.browserProcess.pid; context.debugPort = attempt.debugPort;
   client.events = events; // preserve CDP event stream for diagnostics
   await client.command("Runtime.enable"); await client.command("Log.enable");
+  assert.equal(await value(client, "Array.isArray(window.__sqlbiUnhandledRejections)"), true, "test-side unhandled-rejection listener must be installed before the workflow");
   context.currentPhase = "load-and-select"; await loadProject(client, fixture());
   for (const name of ["Name", "Amount"]) await value(client, `(() => { const node=[...document.querySelectorAll('#tree .node')].find(item=>item.textContent.includes(${JSON.stringify(name)})); const input=node && node.querySelector('input[type=checkbox]'); if(!input) throw new Error('selectable field missing: '+${JSON.stringify(name)}); input.click(); return input.checked; })()`);
   await waitFor(client, "document.querySelectorAll('#tree input[type=checkbox]:checked').length", 2);
@@ -46,7 +50,7 @@ try {
   context.currentPhase = "reopen"; const content = fs.readFileSync(saved, "utf8"); await value(client, `(() => { const input=document.getElementById('projectFile'); const file=new File([${JSON.stringify(content)}], 'reopened.sqlbi', {type:'application/json'}); Object.defineProperty(input,'files',{configurable:true,value:[file]}); input.dispatchEvent(new Event('change',{bubbles:true})); return true; })()`);
   await waitFor(client, "document.querySelectorAll('.filter-row').length", 1); await waitFor(client, "document.getElementById('sql').value.includes('>= 20')");
   assert.equal(await value(client, "document.getElementById('sql').value"), beforeSave, "reopened SQL must equal saved SQL");
-  const unhandled = await value(client, "window.__SQLBI_BROWSER_TEST__ ? window.__SQLBI_BROWSER_TEST__.unhandledRejections() : []");
+  const unhandled = await value(client, "window.__sqlbiUnhandledRejections");
   const unexpected = events.filter(event => event.method === "Runtime.exceptionThrown" || (event.method === "Runtime.consoleAPICalled" && event.params.type === "error") || (event.method === "Log.entryAdded" && event.params.entry.level === "error"));
   assert.equal(unexpected.length, 0, JSON.stringify(unexpected)); assert.deepEqual(unhandled, []);
   console.log("browser typed-filter workflow passed (two typed filters, AND, edit, remove, save/reopen, diagnostics clean)");
