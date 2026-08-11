@@ -587,8 +587,12 @@ async function runBrowserWorkflow() {
   const queryNodeDetails = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
   await pointerClick(client, '#queryGraphNodes [data-node-id="alias:T"]');
   const relatedBefore = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
+  await evaluate(client, `(() => { for (const internal of ["_Document100_VT1","_Fld100011RRef"]) { const node=Array.from(document.querySelectorAll("#tree .node")).find(item=>item.textContent.includes(internal)); if (!node) throw new Error("Tree node missing: " + internal); node.querySelector("button").click(); } })()`);
   await pointerClick(client, '[data-relation-id="reference:field-1-1:_Reference1002"][data-field-internal="_Code"]');
   const relatedAfter = await evaluate(client, semanticExpression);
+  const duplicateState = await evaluate(client, `(() => { const button=document.querySelector('[data-relation-id="reference:field-1-1:_Reference1002"][data-field-internal="_Code"]'); const treeNode=Array.from(document.querySelectorAll("#tree .node")).find(item=>item.textContent.includes("_Code")); return {disabled:!!button?.disabled,treeSelected:!!treeNode?.querySelector('input[type="checkbox"]')?.checked,selectedCount:Object.keys(window.__SQLBI_BROWSER_TEST__.semantic().snapshot.selection.selected).length,sql:window.__SQLBI_BROWSER_TEST__.semantic().sql}; })()`);
+  await pointerClick(client, '[data-relation-id="reference:field-1-1:_Reference1002"][data-field-internal="_Code"]');
+  const duplicateAfter = await evaluate(client, semanticExpression);
   await pointerClick(client, '#queryGraphNodes [data-edge-id^="join:header_detail:"]');
   const queryEdgeDetails = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
   test("query scope is the explicit default query-plan mode", () => assert.equal(queryGraph.scope, "query"));
@@ -598,6 +602,7 @@ async function runBrowserWorkflow() {
   test("query graph edges keep directional aliases and compact physical-column labels", () => { const text=queryGraph.edges.map(edge=>edge.text).join(" "); assert.match(text,/T → H/); assert.match(text,/T → R1/); assert.match(text,/_Document100_IDRRef → _IDRRef/); assert.match(text,/_Fld100011RRef → _IDRRef/); });
   test("reference alias node focus exposes projected field details", () => assert.match(queryNodeDetails, /R1|_Description/));
   test("query node exposes confirmed related data and adds one field through canonical selection", () => { assert.match(relatedBefore,/Доступные связанные данные/); assert.ok(relatedAfter.selectedIds.includes("s:field-1-1:1:_Reference1002:_Code")); assert.match(relatedAfter.sql,/R1\.\[_Code\]/); assert.equal((relatedAfter.sql.match(/LEFT JOIN \[SQLBI\]\.\[dbo\]\.\[_Reference1002\] AS R1/g)||[]).length,1); });
+  test("graph add synchronizes tree and blocks a duplicate projection or join", () => { assert.equal(duplicateState.disabled,true); assert.equal(duplicateState.treeSelected,true); assert.equal(duplicateAfter.selectedIds.length,duplicateState.selectedCount); assert.equal(duplicateAfter.sql,duplicateState.sql); assert.equal((duplicateAfter.sql.match(/R1\.\[_Code\]/g)||[]).length,1); assert.equal((duplicateAfter.sql.match(/LEFT JOIN \[SQLBI\]\.\[dbo\]\.\[_Reference1002\] AS R1/g)||[]).length,1); });
   test("query edge focus exposes physical join details", () => assert.match(queryEdgeDetails, /_Document100_IDRRef|header_detail/));
   console.log("Browser performance characterization (in-page elapsed includes production event/render; round-trip includes CDP):");
   console.table(performanceRows);
