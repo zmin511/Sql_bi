@@ -5,6 +5,7 @@ import { validateJoinChain, chainText } from "./references.js";
 import { resolveSelectionContext } from "./selectionContext.js";
 import { tableFor } from "./tableDetect.js";
 import { isBoolType, isDateField } from "./types.js";
+import { legacyBooleanFilters, normalizeFilters, renderFilterCondition } from "./filters.js";
 import { qname, qualifiedColumn, outputAliasBase, makeUniqueColumnAlias } from "./sqlIdentifiers.js";
 
 function tableName(row) { return String((row && (row.internal || row.object)) || ""); }
@@ -142,11 +143,13 @@ export function buildQueryPlan(input = {}) {
     if (!outputAlias) { diagnostics.push("Поле пропущено: невозможно сформировать выходной alias."); return; }
     const projectionSourceTable = meta && meta.chain.length ? meta.chain.at(-1).targetTable : sourceTable;
     selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
-    const bool = boolValue(id, input.boolFilters || {}); if (bool !== null && isBoolType(field.type)) wheres.push(`${expression} = ${bool}`);
   };
   original.forEach(row => addSelection(row.id, "orig", row, null, row));
   synthetic.forEach(meta => { const source = byId[meta.baseTopId]; if (source) addSelection(meta.id, "synth", null, meta, source); });
   if (!selections.length) return blocked("no_selected_columns", [...diagnostics, "SELECT не сформирован: нет выбранных колонок."], selectionContext, joins);
+  const normalizedFilters = normalizeFilters([...legacyBooleanFilters(input.boolFilters).filter(filter => selections.some(selection => selection.id === filter.fieldId)), ...(input.filters == null ? [] : input.filters)], selections);
+  if (!normalizedFilters.ok) return blocked("invalid_filter", [...diagnostics, normalizedFilters.diagnostic], selectionContext, joins, selections);
+  wheres.push(...normalizedFilters.filters.map(renderFilterCondition));
   const preview = periodRange(input, "__DATE__"); diagnostics.push(...(preview.diagnostics || [])); if (preview.description) diagnostics.push(preview.description);
   const periodField = input.periodFieldId ? byId[input.periodFieldId] || null : null;
   const periodAvailable = !!periodField && original.some(row => row.id === periodField.id) && isDateField(periodField);
@@ -163,5 +166,5 @@ export function buildQueryPlan(input = {}) {
   }
   const from = qname(db, schema, baseTable);
   if (!from) return blocked("invalid_from_table", [...diagnostics, "FROM не сформирован: отсутствует безопасное имя таблицы."], selectionContext, joins);
-  return { status: "ready", reason: null, selectionContext, selections, joins, diagnostics, sqlParts: { from, baseAlias: aliases.base, headerJoin: relationship ? joins[0] : null, wheres, orderBy } };
+  return { status: "ready", reason: null, selectionContext, selections, joins, diagnostics, filters: normalizedFilters.filters, sqlParts: { from, baseAlias: aliases.base, headerJoin: relationship ? joins[0] : null, wheres, orderBy } };
 }

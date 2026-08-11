@@ -74,6 +74,8 @@
     .boolflt{display:inline-flex; align-items:center; gap:6px; margin:0 8px 0 0; font-size:12px; opacity:.95}
     .boolflt label{ display:inline-flex; gap:4px; align-items:center; font-size:12px; color:var(--muted); cursor:pointer; user-select:none; }
     .boolflt input{ width:14px; height:14px; accent-color: var(--accent); }
+    .filter-list { display:grid; gap:7px; margin-top:8px; }
+    .filter-row { display:grid; grid-template-columns:minmax(130px,1fr) minmax(115px,.8fr) minmax(110px,1fr) minmax(110px,1fr) auto; gap:6px; align-items:center; }
     .muted { color: var(--muted); }
     .warn { background:#2a1616; border:1px solid #7f1d1d; padding:8px 10px; border-radius:10px; color:#fecaca; font-size:12px; margin-top:8px; }
     .tiny { font-size:11px; }
@@ -249,6 +251,11 @@
               </select>
             </div>
           </div>
+          <div class="border" aria-label="Условия фильтрации">
+            <div class="row"><b>Условия фильтрации</b><button id="btn-add-filter" class="btn secondary" type="button">Добавить условие</button></div>
+            <div id="filterEditor" class="filter-list"></div>
+            <div id="filterValidation" class="warn" style="display:none"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -308,7 +315,7 @@ var o=((a=s[17])==null?void 0:a[0])?Ob(e,e[_b(s[17][0].data)][0]):[];var l=vb(s[
 var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.s.r;c<=n.e.r;++c){i=Ta(c);for(f=n.s.c;f<=n.e.c;++f){r=s[f]+i;t=l?(e[c]||[])[f]:e[r];a="";if(t===undefined)continue;else if(t.F!=null){r=t.F;if(!t.f)continue;a=t.f;if(r.indexOf(":")==-1)r=r+":"+r}if(t.f!=null)a=t.f;else if(t.t=="z")continue;else if(t.t=="n"&&t.v!=null)a=""+t.v;else if(t.t=="b")a=t.v?"TRUE":"FALSE";else if(t.w!==undefined)a="'"+t.w;else if(t.v===undefined)continue;else if(t.t=="s")a="'"+t.v;else a=""+t.v;o[o.length]=r+"="+a}}return o}function xw(e,r,t){var a=t||{};var n=+!a.skipHeader;var i=e||{};var s=0,f=0;if(i&&a.origin!=null){if(typeof a.origin=="number")s=a.origin;else{var o=typeof a.origin=="string"?Oa(a.origin):a.origin;s=o.r;f=o.c}}var l;var c={s:{c:0,r:0},e:{c:f,r:s+r.length-1+n}};if(i["!ref"]){var h=Da(i["!ref"]);c.e.c=Math.max(c.e.c,h.e.c);c.e.r=Math.max(c.e.r,h.e.r);if(s==-1){s=h.e.r+1;c.e.r=s+r.length-1+n}}else{if(s==-1){s=0;c.e.r=r.length-1+n}}var u=a.header||[],d=0;r.forEach(function(e,r){rr(e).forEach(function(t){if((d=u.indexOf(t))==-1)u[d=u.length]=t;var o=e[t];var c="z";var h="";var v=Ra({c:f+d,r:s+r+n});l=Rw(i,v);if(o&&typeof o==="object"&&!(o instanceof Date)){i[v]=o}else{if(typeof o=="number")c="n";else if(typeof o=="boolean")c="b";else if(typeof o=="string")c="s";else if(o instanceof Date){c="d";if(!a.cellDates){c="n";o=fr(o)}h=a.dateNF||X[14]}else if(o===null&&a.nullError){c="e";o=0}if(!l)i[v]=l={t:c,v:o};else{l.t=c;l.v=o;delete l.w;delete l.R;if(h)l.z=h}if(h)l.z=h}})});c.e.c=Math.max(c.e.c,f+u.length-1);var v=Ta(s);if(n)for(d=0;d<u.length;++d)i[ya(d+f)+v]={t:"s",v:u[d]};i["!ref"]=Na(c);return i}function Ow(e,r){return xw(null,e,r)}function Rw(e,r,t){if(typeof r=="string"){if(Array.isArray(e)){var a=Oa(r);if(!e[a.r])e[a.r]=[];return e[a.r][a.c]||(e[a.r][a.c]={t:"z"})}return e[r]||(e[r]={t:"z"})}if(typeof r!="number")return Rw(e,Ra(r));return Rw(e,Ra({r:r,c:t||0}))}function Iw(e,r){if(typeof r=="number"){if(r>=0&&e.SheetNames.length>r)return r;throw new Error("Cannot find sheet # "+r)}else if(typeof r=="string"){var t=e.SheetNames.indexOf(r);if(t>-1)return t;throw new Error("Cannot find sheet name |"+r+"|")}else throw new Error("Cannot find sheet |"+r+"|")}function Nw(){return{SheetNames:[],Sheets:{}}}function Dw(e,r,t,a){var n=1;if(!t)for(;n<=65535;++n,t=undefined)if(e.SheetNames.indexOf(t="Sheet"+n)==-1)break;if(!t||e.SheetNames.length>=65535)throw new Error("Too many worksheets");if(a&&e.SheetNames.indexOf(t)>=0){var i=t.match(/(^.*?)(\d+)$/);n=i&&+i[2]||0;var s=i&&i[1]||t;for(++n;n<=65535;++n)if(e.SheetNames.indexOf(t=s+n)==-1)break}Jp(t);if(e.SheetNames.indexOf(t)>=0)throw new Error("Worksheet with name |"+t+"| already exists!");e.SheetNames.push(t);e.Sheets[t]=r;return t}function Fw(e,r,t){if(!e.Workbook)e.Workbook={};if(!e.Workbook.Sheets)e.Workbook.Sheets=[];var a=Iw(e,r);if(!e.Workbook.Sheets[a])e.Workbook.Sheets[a]={};switch(t){case 0:;case 1:;case 2:break;default:throw new Error("Bad sheet visibility setting "+t);}e.Workbook.Sheets[a].Hidden=t}function Pw(e,r){e.z=r;return e}function Lw(e,r,t){if(!r){delete e.l}else{e.l={Target:r};if(t)e.l.Tooltip=t}return e}function Mw(e,r,t){return Lw(e,"#"+r,t)}function Uw(e,r,t){if(!e.c)e.c=[];e.c.push({t:r,a:t||"SheetJS"})}function Bw(e,r,t,a){var n=typeof r!="string"?r:Da(r);var i=typeof r=="string"?r:Na(r);for(var s=n.s.r;s<=n.e.r;++s)for(var f=n.s.c;f<=n.e.c;++f){var o=Rw(e,s,f);o.t="n";o.F=i;delete o.v;if(s==n.s.r&&f==n.s.c){o.f=t;if(a)o.D=true}}return e}var Ww={encode_col:ya,encode_row:Ta,encode_cell:Ra,encode_range:Na,decode_col:Ca,decode_row:ka,split_cell:xa,decode_cell:Oa,decode_range:Ia,format_cell:Pa,sheet_add_aoa:Ma,sheet_add_json:xw,sheet_add_dom:Gm,aoa_to_sheet:Ua,json_to_sheet:Ow,table_to_sheet:jm,table_to_book:Xm,sheet_to_csv:yw,sheet_to_txt:Sw,sheet_to_json:Aw,sheet_to_html:Vm,sheet_to_formulae:_w,sheet_to_row_object_array:Aw,sheet_get_cell:Rw,book_new:Nw,book_append_sheet:Dw,book_set_sheet_visibility:Fw,cell_set_number_format:Pw,cell_set_hyperlink:Lw,cell_set_internal_link:Mw,cell_add_comment:Uw,sheet_set_array_formula:Bw,consts:{SHEET_VISIBLE:0,SHEET_HIDDEN:1,SHEET_VERY_HIDDEN:2}};var Hw;function zw(e){Hw=e}function Vw(e,r){var t=Hw();var a=r==null?{}:r;if(e==null||e["!ref"]==null){t.push(null);return t}var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=n.s.r;var g=false,m=0;t._read=function(){if(!g){g=true;return t.push("\ufeff")}while(p<=n.e.r){++p;if((d[p-1]||{}).hidden)continue;c=Cw(e,n,p-1,h,s,o,i,a);if(c!=null){if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)return t.push((m++?f:"")+c)}}return t.push(null)};return t}function Gw(e,r){var t=Hw();var a=r||{};var n=a.header!=null?a.header:Bm;var i=a.footer!=null?a.footer:Wm;t.push(n);var s=Ia(e["!ref"]);a.dense=Array.isArray(e);t.push(zm(e,s,a));var f=s.s.r;var o=false;t._read=function(){if(f>s.e.r){if(!o){o=true;t.push("</table>"+i)}return t.push(null)}while(f<=s.e.r){t.push(Um(e,s,f,a));++f;break}};return t}function jw(e,r){var t=Hw({objectMode:true});if(e==null||e["!ref"]==null){t.push(null);return t}var a={t:"n",v:0},n=0,i=1,s=[],f=0,o="";var l={s:{r:0,c:0},e:{r:0,c:0}};var c=r||{};var h=c.range!=null?c.range:e["!ref"];if(c.header===1)n=1;else if(c.header==="A")n=2;else if(Array.isArray(c.header))n=3;switch(typeof h){case"string":l=Da(h);break;case"number":l=Da(e["!ref"]);l.s.r=h;break;default:l=h;}if(n>0)i=0;var u=Ta(l.s.r);var d=[];var v=0;var p=Array.isArray(e);var g=l.s.r,m=0;var b={};if(p&&!e[g])e[g]=[];var w=c.skipHidden&&e["!cols"]||[];var k=c.skipHidden&&e["!rows"]||[];for(m=l.s.c;m<=l.e.c;++m){if((w[m]||{}).hidden)continue;d[m]=ya(m);a=p?e[g][m]:e[d[m]+u];switch(n){case 1:s[m]=m-l.s.c;break;case 2:s[m]=d[m];break;case 3:s[m]=c.header[m-l.s.c];break;default:if(a==null)a={w:"__EMPTY",t:"s"};o=f=Pa(a,null,c);v=b[f]||0;if(!v)b[f]=1;else{do{o=f+"_"+v++}while(b[o]);b[f]=v;b[o]=1}s[m]=o;}}g=l.s.r+i;t._read=function(){while(g<=l.e.r){if((k[g-1]||{}).hidden)continue;var r=Tw(e,l,g,d,n,s,p,c);++g;if(r.isempty===false||(n===1?c.blankrows!==false:!!c.blankrows)){t.push(r.row);return}}return t.push(null)};return t}var Xw={to_json:jw,to_html:Gw,to_csv:Vw,set_readable:zw};if(typeof vm!=="undefined")e.parse_xlscfb=vm;e.parse_zip=Xb;e.read=iw;e.readFile=sw;e.readFileSync=sw;e.write=gw;e.writeFile=bw;e.writeFileSync=bw;e.writeFileAsync=kw;e.utils=Ww;e.writeXLSX=pw;e.writeFileXLSX=ww;e.SSF=Ve;if(typeof Xw!=="undefined")e.stream=Xw;if(typeof Ke!=="undefined")e.CFB=Ke;if(typeof require!=="undefined"){var $w=undefined;if(($w||{}).Readable)zw($w.Readable)}}if(typeof exports!=="undefined")make_xlsx_lib(exports);else if(typeof module!=="undefined"&&module.exports)make_xlsx_lib(module.exports);else if(typeof define==="function"&&define.amd)define("xlsx",function(){if(!XLSX.version)make_xlsx_lib(XLSX);return XLSX});else make_xlsx_lib(XLSX);if(typeof window!=="undefined"&&!window.XLSX)try{window.XLSX=XLSX}catch(e){}
 <!-- BEGIN GENERATED CANONICAL CORE -->
 /* Generated from canonical src/core modules. Do not edit manually. */
-/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/queryPlan.js","sha256":"0935e0bb0947e7db7afab621da9c12c5093976adeb341cfdfcabc79ce0340285"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"59cbdabe64f669ff0557686f1a60c009484d08da912e26cb1cc000d6fa96648c"}],"payloadSha256":"44f70c7eaf548937a67192280e7c5f4f0e69a2418a89b8d6e8258cd04bcafe16"} */
+/* SQLBI_CANONICAL_MANIFEST {"format":1,"modules":[{"file":"src/core/sqlIdentifiers.js","sha256":"03f34fd4959326d3be5dce41c68b539ce8c556c68d168d083d70ad45d487aa4f"},{"file":"src/core/types.js","sha256":"d2fbabea0f6797e4a070721d4113eb10d73728cbb1ec35aedcfedd6959c636f9"},{"file":"src/core/tableDetect.js","sha256":"2d6d533830d4eabdeaf0abfeb9caa9a10b07680f9b159141becb6599a497f749"},{"file":"src/core/relationships.js","sha256":"fa9f8b8b2676e6fed742908f51a77fc2455ce3e18a7f6535ee0bc74b6908329c"},{"file":"src/core/references.js","sha256":"8f4024bee093488bf06f34677a8e6416921a9a2c3005d365168d73660d6dcf30"},{"file":"src/core/selectionContext.js","sha256":"4b056ce21ff2e05a6787395c811da88e6cf91965448625947033fddd5658da6b"},{"file":"src/core/casts.js","sha256":"53b5e4eaeab726348796d2f32af075c69e131c957bcb9539c9cbd576e9f0f434"},{"file":"src/core/dates.js","sha256":"631b717a7741a676fcb5ff10ecef382854e61d354b47d41da22516d7c11b8af6"},{"file":"src/core/filters.js","sha256":"609def99b24ad2f701f6a5b47d0fc613cea99a4fb7db5e74dd7e70b439d58e75"},{"file":"src/core/queryPlan.js","sha256":"403b495488611fba243c676505e3af911da46ef398d304924e78f2e6ae614183"},{"file":"src/core/sqlGenerate.js","sha256":"c596a5e99b9b8dc7c93752007e25d4b29259510914240fcd93ab20a78df9b197"},{"file":"src/core/project.js","sha256":"d087abfaa348e3a70b558fcd1a877cade72ec62b1b481c37cdc4ea1195d813c6"}],"payloadSha256":"b3b4c5d4c97515aa71aca8e3bb2ede3b6ebb95b806fba341b01cbd4f8d56736f"} */
 (function(){
 // src/core/sqlIdentifiers.js
 function quoteIdentifier(value) {
@@ -2285,6 +2292,19 @@ function buildManualDateRange(
   };
 }
 
+// src/core/filters.js
+const OPS={boolean:new Set(["is_true","is_false"]),text:new Set(["eq","ne","contains","starts_with","ends_with","is_null","is_not_null"]),number:new Set(["eq","ne","gt","gte","lt","lte","between","is_null","is_not_null"]),date:new Set(["eq","before","after","between","is_null","is_not_null"]),reference:new Set(["eq","ne","is_null","is_not_null"])};
+const nullOps=new Set(["is_null","is_not_null"]);
+function filterFieldType(field={}){if(isBoolType(field.type))return "boolean";if(isDateField(field))return "date";if(isReferenceField(field))return "reference";if(parseNumericType(field.type).matched||/^(?:int|integer|bigint)$/iu.test(String(field.type||"").trim()))return "number";return "text";}
+const text=v=>typeof v==="string"?`N'${v.replace(/'/g,"''")}'`:null;
+const number=v=>{const s=String(v??"").trim();return /^-?(?:\d+|\d+\.\d+|\.\d+)$/u.test(s)&&Number.isFinite(Number(s))?s:null;};
+const date=v=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/u.test(v)&&!Number.isNaN(Date.parse(`${v}T00:00:00Z`))?text(v):null;
+const guid=v=>typeof v==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(v.trim())?text(v.trim().toLowerCase()):null;
+const invalid=(i,f,o,reason)=>({ok:false,diagnostic:`Filter ${i+1} (${f||"<missing>"}, ${o||"<missing>"}): ${reason}.`});
+function normalizeFilters(filters,selections){if(filters==null)return{ok:true,filters:[]};if(!Array.isArray(filters))return invalid(0,"","","filter list is malformed");const selected=new Map(selections.map(s=>[String(s.id),s]));const out=[];for(let i=0;i<filters.length;i++){const x=filters[i];if(!x||typeof x!=="object"||Array.isArray(x))return invalid(i,"","","filter is malformed");const fieldId=typeof x.fieldId==="string"?x.fieldId:"",operator=typeof x.operator==="string"?x.operator:"",selection=selected.get(fieldId);if(!selection)return invalid(i,fieldId,operator,"field is not selected or has no resolved physical origin");const kind=filterFieldType(selection.field);if(!OPS[kind].has(operator))return invalid(i,fieldId,operator,`operator is not valid for ${kind}`);const base={id:typeof x.id==="string"&&x.id?x.id:`filter-${i+1}`,fieldId,operator,kind,expression:selection.expression};if(nullOps.has(operator)||kind==="boolean"){out.push(base);continue;}const convert=kind==="number"?number:kind==="date"?date:kind==="reference"?guid:text;if(operator==="between"){const vals=Array.isArray(x.values)?x.values:[],a=convert(vals[0]),b=convert(vals[1]);if(!a||!b)return invalid(i,fieldId,operator,"between requires two valid values");out.push({...base,values:[a,b]});}else{const value=convert(x.value);if(!value)return invalid(i,fieldId,operator,"missing or invalid value");out.push({...base,value});}}return{ok:true,filters:out};}
+function renderFilterCondition(f){const e=f.expression;if(f.operator==="is_null")return `${e} IS NULL`;if(f.operator==="is_not_null")return `${e} IS NOT NULL`;if(f.operator==="is_true")return `${e} = 1`;if(f.operator==="is_false")return `${e} = 0`;if(f.operator==="between")return `${e} BETWEEN ${f.values[0]} AND ${f.values[1]}`;if(f.operator==="contains")return `${e} LIKE N'%' + ${f.value} + N'%'`;if(f.operator==="starts_with")return `${e} LIKE ${f.value} + N'%'`;if(f.operator==="ends_with")return `${e} LIKE N'%' + ${f.value}`;return `${e} ${({eq:"=",ne:"<>",gt:">",gte:">=",lt:"<",lte:"<=",before:"<",after:">"})[f.operator]} ${f.value}`;}
+function legacyBooleanFilters(values={}){return Object.entries(values).flatMap(([fieldId,v])=>v&&v.yes&&!v.no?[{id:`legacy-bool-${fieldId}`,fieldId,operator:"is_true"}]:v&&v.no&&!v.yes?[{id:`legacy-bool-${fieldId}`,fieldId,operator:"is_false"}]:[]);}
+
 // src/core/queryPlan.js
 function tableName(row) { return String((row && (row.internal || row.object)) || ""); }
 function childrenFor(rows, inputChildren) {
@@ -2421,11 +2441,13 @@ function buildQueryPlan(input = {}) {
     if (!outputAlias) { diagnostics.push("Поле пропущено: невозможно сформировать выходной alias."); return; }
     const projectionSourceTable = meta && meta.chain.length ? meta.chain.at(-1).targetTable : sourceTable;
     selections.push({ id, selectionId: id, kind, sourceRowId: sourceRow ? sourceRow.id : row.id, sourceTable: projectionSourceTable, sourceField: String(field.internal || field.object || ""), sourceAlias, field: { ...field }, outputAlias, expression, status: "active", reason: null, chain: meta ? meta.chain.map(step => ({ ...step })) : [] });
-    const bool = boolValue(id, input.boolFilters || {}); if (bool !== null && isBoolType(field.type)) wheres.push(`${expression} = ${bool}`);
   };
   original.forEach(row => addSelection(row.id, "orig", row, null, row));
   synthetic.forEach(meta => { const source = byId[meta.baseTopId]; if (source) addSelection(meta.id, "synth", null, meta, source); });
   if (!selections.length) return blocked("no_selected_columns", [...diagnostics, "SELECT не сформирован: нет выбранных колонок."], selectionContext, joins);
+  const normalizedFilters = normalizeFilters([...legacyBooleanFilters(input.boolFilters).filter(filter => selections.some(selection => selection.id === filter.fieldId)), ...(input.filters == null ? [] : input.filters)], selections);
+  if (!normalizedFilters.ok) return blocked("invalid_filter", [...diagnostics, normalizedFilters.diagnostic], selectionContext, joins, selections);
+  wheres.push(...normalizedFilters.filters.map(renderFilterCondition));
   const preview = periodRange(input, "__DATE__"); diagnostics.push(...(preview.diagnostics || [])); if (preview.description) diagnostics.push(preview.description);
   const periodField = input.periodFieldId ? byId[input.periodFieldId] || null : null;
   const periodAvailable = !!periodField && original.some(row => row.id === periodField.id) && isDateField(periodField);
@@ -2442,7 +2464,7 @@ function buildQueryPlan(input = {}) {
   }
   const from = qname(db, schema, baseTable);
   if (!from) return blocked("invalid_from_table", [...diagnostics, "FROM не сформирован: отсутствует безопасное имя таблицы."], selectionContext, joins);
-  return { status: "ready", reason: null, selectionContext, selections, joins, diagnostics, sqlParts: { from, baseAlias: aliases.base, headerJoin: relationship ? joins[0] : null, wheres, orderBy } };
+  return { status: "ready", reason: null, selectionContext, selections, joins, diagnostics, filters: normalizedFilters.filters, sqlParts: { from, baseAlias: aliases.base, headerJoin: relationship ? joins[0] : null, wheres, orderBy } };
 }
 
 // src/core/sqlGenerate.js
@@ -2514,6 +2536,15 @@ function validIsoDate(value) {
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
+function filterList(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(value).filter(item => item && typeof item === "object" && !Array.isArray(item) && typeof item.id === "string" && item.id && typeof item.fieldId === "string" && item.fieldId && typeof item.operator === "string" && item.operator).map(item => {
+    const next = { id: item.id, fieldId: item.fieldId, operator: item.operator };
+    if (typeof item.value === "string" || typeof item.value === "number" || typeof item.value === "boolean") next.value = item.value;
+    if (Array.isArray(item.values)) next.values = item.values.filter(value => typeof value === "string" || typeof value === "number" || typeof value === "boolean").slice(0, 2);
+    return next;
+  });
+}
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.length > 0;
@@ -2563,6 +2594,7 @@ function createProjectSnapshot(state, appVersion = "0.2.1") {
       selected,
       synthetic,
       boolFilters: boolFilterMap(state.boolFilters),
+      filters: filterList(state.filters),
       flatten: booleanMap(state.flatten)
     },
     query: {
@@ -2638,21 +2670,25 @@ function parseProjectSnapshot(input) {
   const view = plainObject(project.view);
   const periodFieldId = stringValue(query.periodFieldId);
   const normalizedBoolFilters = boolFilterMap(selection.boolFilters);
+  const normalizedFilters = filterList(selection.filters);
   const validFilterIds = new Set([...ids, ...Object.keys(safeSynthetic)]);
   const droppedSelectedIds = Object.keys(rawSelected).filter(id => !own(selected, id)).sort();
   const droppedBoolFilterIds = Object.keys(normalizedBoolFilters).filter(id => !validFilterIds.has(id)).sort();
+  const droppedFilterIds = normalizedFilters.filter(filter => !validFilterIds.has(filter.fieldId)).map(filter => filter.id).sort();
   const droppedPeriodFieldId = periodFieldId && !ids.has(periodFieldId) ? periodFieldId : "";
   const loadDiagnostics = {
     droppedSelectedIds,
     droppedBoolFilterIds,
+    droppedFilterIds,
     droppedPeriodFieldId,
-    recovered: Boolean(droppedSelectedIds.length || droppedBoolFilterIds.length || droppedPeriodFieldId)
+    recovered: Boolean(droppedSelectedIds.length || droppedBoolFilterIds.length || droppedFilterIds.length || droppedPeriodFieldId)
   };
   return {
     rows: normalizedRows,
     selected,
     metaById: safeSynthetic,
     boolFilters: Object.fromEntries(Object.entries(normalizedBoolFilters).filter(([id]) => validFilterIds.has(id))),
+    filters: normalizedFilters.filter(filter => validFilterIds.has(filter.fieldId)),
     flatten: booleanMap(selection.flatten),
     expanded: Object.fromEntries(Object.entries(booleanMap(view.expanded)).filter(([id]) => ids.has(id) || own(safeSynthetic, id))),
     search: stringValue(view.search),
@@ -2675,7 +2711,7 @@ function parseProjectSnapshot(input) {
   };
 }
 
-window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizationSettings, createProjectSnapshot, parseProjectSnapshot };
+window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizationSettings, createProjectSnapshot, parseProjectSnapshot, filterFieldType };
 })();
 <!-- END GENERATED CANONICAL CORE -->
 </script>
@@ -2694,6 +2730,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       metaById:{},       // для синтетических узлов
       referenceDiagnostics:{}, // nodeId -> сообщение безопасного разрешения ссылки
       boolFilters:{},    // id -> {yes,no}
+      filters:[],
       queryPlan:null, queryResult:null, queryGraph:{viewMode:"split",graphFilter:"all"},
       queryGraphFocus:{kind:null,id:null},
       flatten:{}    // tableName -> true (режим "Плоская" для _VT)
@@ -2772,7 +2809,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       state.rows = rows;
       const built = buildTree(rows);
       state.byId=built.byId; state.children=built.children; state.roots=built.roots;
-      state.selected={}; state.expanded={}; state.metaById={}; state.referenceDiagnostics={}; state.boolFilters={}; state.flatten={}; state.queryGraphFocus={kind:null,id:null};
+      state.selected={}; state.expanded={}; state.metaById={}; state.referenceDiagnostics={}; state.boolFilters={}; state.filters=[]; state.flatten={}; state.queryGraphFocus={kind:null,id:null};
       state.periodFieldId="";
       state.dateFrom=""; state.dateTo="";
       if($("dateFrom")) $("dateFrom").value="";
@@ -2786,7 +2823,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       const built=buildTree(restored.rows);
       state.byId=built.byId; state.children=built.children; state.roots=built.roots;
       state.selected=restored.selected; state.metaById=restored.metaById;
-      state.boolFilters=restored.boolFilters; state.flatten=restored.flatten; state.expanded=restored.expanded;
+      state.boolFilters=restored.boolFilters; state.filters=restored.filters || []; state.flatten=restored.flatten; state.expanded=restored.expanded;
       state.referenceDiagnostics={}; state.search=restored.search;
       state.serverName=restored.serverName; state.dbName=restored.dbName; state.schema=restored.schema; state.fromTable=restored.fromTable;
       state.periodFieldId=restored.periodFieldId; state.periodMode=restored.periodMode;
@@ -4242,7 +4279,12 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       $("queryGraphSvg").innerHTML = visibleEdges.map((edge, index) => `<line data-edge-id="${escapeHtml(edge.id)}" x1="0" y1="${12 + index * 12}" x2="100" y2="${12 + index * 12}" stroke="${edge.status === "sql" ? "#2563eb" : "#b45309"}"/>`).join("");
       return model;
     }
-    function buildCanonicalInputFromState(){ return { rows:state.rows, byId:state.byId, selected:{...state.selected}, metaById:state.metaById, boolFilters:state.boolFilters, refDepth:state.refDepth, schema:state.schema, dbName:state.dbName, fromTable:state.fromTable, periodFieldId:state.periodFieldId, periodMode:state.periodMode, periodMonths:state.periodMonths, periodDays:state.periodDays, periodMonthsFuture:state.periodMonthsFuture, periodDaysFuture:state.periodDaysFuture, dateFrom:state.dateFrom, dateTo:state.dateTo }; }
+    function filterOperators(row){ const type=window.SQLBICanonicalCore.filterFieldType?window.SQLBICanonicalCore.filterFieldType(row):"text"; return type==="boolean"?[['is_true','Да'],['is_false','Нет']]:type==="number"?[['eq','='],['ne','≠'],['gt','>'],['gte','≥'],['lt','<'],['lte','≤'],['between','Между'],['is_null','Пусто'],['is_not_null','Не пусто']]:type==="date"?[['eq','В дату'],['before','До'],['after','После'],['between','Между'],['is_null','Пусто'],['is_not_null','Не пусто']]:type==="reference"?[['eq','='],['ne','≠'],['is_null','Пусто'],['is_not_null','Не пусто']]:[['eq','='],['ne','≠'],['contains','Содержит'],['starts_with','Начинается с'],['ends_with','Заканчивается на'],['is_null','Пусто'],['is_not_null','Не пусто']]; }
+    function renderFilterEditor(){ const host=$("filterEditor"); if(!host)return; const fields=Object.keys(state.selected).filter(id=>state.selected[id]).map(id=>({id,row:state.byId[id]||(state.metaById[id]&&state.metaById[id].field)})).filter(x=>x.row); host.innerHTML=state.filters.map((filter,index)=>{const row=(fields.find(x=>x.id===filter.fieldId)||fields[0]||{}).row; const ops=row?filterOperators(row):[]; const nullish=['is_null','is_not_null'].includes(filter.operator),between=filter.operator==='between'; return `<div class="filter-row" data-filter-index="${index}"><select class="input filter-field">${fields.map(f=>`<option value="${f.id}" ${f.id===filter.fieldId?'selected':''}>${escapeHtml(f.row.title||f.row.object||f.row.internal||f.id)}</option>`).join('')}</select><select class="input filter-operator">${ops.map(([v,l])=>`<option value="${v}" ${v===filter.operator?'selected':''}>${l}</option>`).join('')}</select><input class="input filter-value" ${nullish?'disabled':''} value="${escapeHtml(filter.value??'')}" placeholder="Значение"><input class="input filter-value2" style="display:${between?'block':'none'}" value="${escapeHtml(filter.values&&filter.values[1]||'')}" placeholder="До"><button class="btn ghost filter-remove" type="button">Удалить</button></div>`; }).join(''); const validation=$("filterValidation"); const result=state.queryResult; const message=result&&result.plan&&result.plan.reason==='invalid_filter'?(result.diagnostics||[]).at(-1):''; validation.textContent=message||''; validation.style.display=message?'block':'none'; }
+    $("btn-add-filter").onclick=()=>{const id=Object.keys(state.selected).find(key=>state.selected[key]);if(!id)return;state.filters.push({id:`filter-${Date.now()}-${state.filters.length}`,fieldId:id,operator:'eq',value:''});renderFilterEditor();renderSQL();};
+    $("filterEditor").onchange=e=>{const row=e.target.closest('[data-filter-index]');if(!row)return;const filter=state.filters[Number(row.dataset.filterIndex)];if(!filter)return;if(e.target.classList.contains('filter-field')){filter.fieldId=e.target.value;filter.operator='eq';delete filter.value;delete filter.values;}else if(e.target.classList.contains('filter-operator')){filter.operator=e.target.value;delete filter.value;delete filter.values;}else if(e.target.classList.contains('filter-value'))filter.value=e.target.value;else if(e.target.classList.contains('filter-value2'))filter.values=[filter.value||'',e.target.value];renderFilterEditor();renderSQL();};
+    $("filterEditor").onclick=e=>{if(!e.target.classList.contains('filter-remove'))return;const row=e.target.closest('[data-filter-index]');state.filters.splice(Number(row.dataset.filterIndex),1);renderFilterEditor();renderSQL();};
+    function buildCanonicalInputFromState(){ return { rows:state.rows, byId:state.byId, selected:{...state.selected}, metaById:state.metaById, boolFilters:state.boolFilters, filters:state.filters, refDepth:state.refDepth, schema:state.schema, dbName:state.dbName, fromTable:state.fromTable, periodFieldId:state.periodFieldId, periodMode:state.periodMode, periodMonths:state.periodMonths, periodDays:state.periodDays, periodMonthsFuture:state.periodMonthsFuture, periodDaysFuture:state.periodDaysFuture, dateFrom:state.dateFrom, dateTo:state.dateTo }; }
     function renderQueryPlanPanel(plan){
       const status=$("queryPlanStatus"),counts=$("queryPlanCounts"),joins=$("queryPlanJoins"),projected=$("queryPlanProjectedFields"),empty=$("queryPlanProjectedFieldsEmpty");
       projected.replaceChildren();
@@ -4264,7 +4306,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       }
       empty.textContent=(plan.selections||[]).length?"":plan.status==="blocked"?`Projected fields недоступны: ${plan.reason}.`:"Нет выбранных полей для SELECT.";
     }
-    function renderCanonicalSQL(){ const out=$("sql"),hint=$("sqlHint"),core=window.SQLBICanonicalCore; if(!core||typeof core.generateSql!=="function") throw new Error("Embedded canonical core is unavailable."); const result=core.generateSql(buildCanonicalInputFromState()); state.queryResult=result;state.queryPlan=result.plan;$("selCount").textContent=Object.keys(state.selected).filter(id=>state.selected[id]).length; out.value=result.plan&&result.plan.sqlParts&&result.plan.sqlParts.empty?"-- Выберите хотя бы одно доступное SQL-поле слева":(result.sql||"-- SQL ЗАБЛОКИРОВАН"); hint.textContent=result.hint||"";hint.style.display=result.hint?"block":"none";renderDiagnostics(result.diagnostics||[]);renderQueryPlanPanel(result.plan);queueMicrotask(syncExportButtons);return result; }
+    function renderCanonicalSQL(){ const out=$("sql"),hint=$("sqlHint"),core=window.SQLBICanonicalCore; if(!core||typeof core.generateSql!=="function") throw new Error("Embedded canonical core is unavailable."); const result=core.generateSql(buildCanonicalInputFromState()); state.queryResult=result;state.queryPlan=result.plan;$("selCount").textContent=Object.keys(state.selected).filter(id=>state.selected[id]).length; out.value=result.plan&&result.plan.sqlParts&&result.plan.sqlParts.empty?"-- Выберите хотя бы одно доступное SQL-поле слева":(result.sql||"-- SQL ЗАБЛОКИРОВАН"); hint.textContent=result.hint||"";hint.style.display=result.hint?"block":"none";renderDiagnostics(result.diagnostics||[]);renderQueryPlanPanel(result.plan);renderFilterEditor();queueMicrotask(syncExportButtons);return result; }
     function renderSQL(){
       const result = renderCanonicalSQL();
       renderQueryGraph();
@@ -4273,7 +4315,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
     // UI handlers
     //$("btn-load").onclick = ()=> $("xlsx").click();
     $("btn-clear").onclick = ()=>{
-      state.selected={}; state.boolFilters={}; state.flatten={}; state.periodFieldId="";
+      state.selected={}; state.boolFilters={}; state.filters=[]; state.flatten={}; state.periodFieldId="";
       renderTree(); renderSQL();
     };
     $("search").oninput = (e)=>{ state.search=e.target.value; renderTree(); };
@@ -4479,7 +4521,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizatio
       state.selected = {"3":true,"4":true,"5":true};
       state.expanded = {"1":true,"2":true,"5":true};
       state.metaById = {};
-      state.boolFilters = {};
+      state.boolFilters = {}; state.filters=[];
       renderTree(); renderSQL();
     };
 

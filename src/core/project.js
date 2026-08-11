@@ -43,6 +43,15 @@ function validIsoDate(value) {
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
+function filterList(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(value).filter(item => item && typeof item === "object" && !Array.isArray(item) && typeof item.id === "string" && item.id && typeof item.fieldId === "string" && item.fieldId && typeof item.operator === "string" && item.operator).map(item => {
+    const next = { id: item.id, fieldId: item.fieldId, operator: item.operator };
+    if (typeof item.value === "string" || typeof item.value === "number" || typeof item.value === "boolean") next.value = item.value;
+    if (Array.isArray(item.values)) next.values = item.values.filter(value => typeof value === "string" || typeof value === "number" || typeof value === "boolean").slice(0, 2);
+    return next;
+  });
+}
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.length > 0;
@@ -92,6 +101,7 @@ export function createProjectSnapshot(state, appVersion = "0.2.1") {
       selected,
       synthetic,
       boolFilters: boolFilterMap(state.boolFilters),
+      filters: filterList(state.filters),
       flatten: booleanMap(state.flatten)
     },
     query: {
@@ -167,21 +177,25 @@ export function parseProjectSnapshot(input) {
   const view = plainObject(project.view);
   const periodFieldId = stringValue(query.periodFieldId);
   const normalizedBoolFilters = boolFilterMap(selection.boolFilters);
+  const normalizedFilters = filterList(selection.filters);
   const validFilterIds = new Set([...ids, ...Object.keys(safeSynthetic)]);
   const droppedSelectedIds = Object.keys(rawSelected).filter(id => !own(selected, id)).sort();
   const droppedBoolFilterIds = Object.keys(normalizedBoolFilters).filter(id => !validFilterIds.has(id)).sort();
+  const droppedFilterIds = normalizedFilters.filter(filter => !validFilterIds.has(filter.fieldId)).map(filter => filter.id).sort();
   const droppedPeriodFieldId = periodFieldId && !ids.has(periodFieldId) ? periodFieldId : "";
   const loadDiagnostics = {
     droppedSelectedIds,
     droppedBoolFilterIds,
+    droppedFilterIds,
     droppedPeriodFieldId,
-    recovered: Boolean(droppedSelectedIds.length || droppedBoolFilterIds.length || droppedPeriodFieldId)
+    recovered: Boolean(droppedSelectedIds.length || droppedBoolFilterIds.length || droppedFilterIds.length || droppedPeriodFieldId)
   };
   return {
     rows: normalizedRows,
     selected,
     metaById: safeSynthetic,
     boolFilters: Object.fromEntries(Object.entries(normalizedBoolFilters).filter(([id]) => validFilterIds.has(id))),
+    filters: normalizedFilters.filter(filter => validFilterIds.has(filter.fieldId)),
     flatten: booleanMap(selection.flatten),
     expanded: Object.fromEntries(Object.entries(booleanMap(view.expanded)).filter(([id]) => ids.has(id) || own(safeSynthetic, id))),
     search: stringValue(view.search),

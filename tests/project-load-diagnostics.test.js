@@ -25,6 +25,7 @@ assert.deepEqual(
   {
     droppedSelectedIds: ["missing"],
     droppedBoolFilterIds: ["missing"],
+    droppedFilterIds: [],
     droppedPeriodFieldId: "missing",
     recovered: true
   },
@@ -47,6 +48,7 @@ const clean = parseProjectSnapshot(cleanProject);
 assert.deepEqual(clean.loadDiagnostics, {
   droppedSelectedIds: [],
   droppedBoolFilterIds: [],
+  droppedFilterIds: [],
   droppedPeriodFieldId: "",
   recovered: false
 });
@@ -88,6 +90,7 @@ assert.deepEqual(
 assert.deepEqual(syntheticBooleanRestored.loadDiagnostics, {
   droppedSelectedIds: [],
   droppedBoolFilterIds: [],
+  droppedFilterIds: [],
   droppedPeriodFieldId: "",
   recovered: false
 });
@@ -102,6 +105,7 @@ assert.deepEqual(staleSyntheticFilterRestored.boolFilters, {});
 assert.deepEqual(staleSyntheticFilterRestored.loadDiagnostics, {
   droppedSelectedIds: [],
   droppedBoolFilterIds: ["syntheticBoolean"],
+  droppedFilterIds: [],
   droppedPeriodFieldId: "",
   recovered: true
 });

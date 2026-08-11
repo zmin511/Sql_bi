@@ -4,7 +4,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const htmlPath = path.join(root, "index.html");
-const modules = ["sqlIdentifiers.js", "types.js", "tableDetect.js", "relationships.js", "references.js", "selectionContext.js", "casts.js", "dates.js", "queryPlan.js", "sqlGenerate.js", "project.js"].map(name => `src/core/${name}`);
+const modules = ["sqlIdentifiers.js", "types.js", "tableDetect.js", "relationships.js", "references.js", "selectionContext.js", "casts.js", "dates.js", "filters.js", "queryPlan.js", "sqlGenerate.js", "project.js"].map(name => `src/core/${name}`);
 const begin = "<!-- BEGIN GENERATED CANONICAL CORE -->";
 const end = "<!-- END GENERATED CANONICAL CORE -->";
 export function normalizeSourceText(text) {
@@ -25,7 +25,7 @@ function transform(source) {
 export function buildEmbeddedBlock() {
   const sources = modules.map(file => ({ file, source: normalizeSourceText(fs.readFileSync(path.join(root, file), "utf8")) }));
   const manifest = { format: 1, modules: sources.map(item => ({ file: item.file, sha256: hash(item.source) })) };
-  const payload = `(function(){\n${sources.map(item => `// ${item.file}\n${transform(item.source)}`).join("\n")}\nwindow.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizationSettings, createProjectSnapshot, parseProjectSnapshot };\n})();\n`;
+  const payload = `(function(){\n${sources.map(item => `// ${item.file}\n${transform(item.source)}`).join("\n")}\nwindow.SQLBICanonicalCore = { buildQueryPlan, generateSql, normalizeVisualizationSettings, createProjectSnapshot, parseProjectSnapshot, filterFieldType };\n})();\n`;
   manifest.payloadSha256 = hash(payload);
   return `${begin}\n/* Generated from canonical src/core modules. Do not edit manually. */\n/* SQLBI_CANONICAL_MANIFEST ${JSON.stringify(manifest)} */\n${payload}${end}`;
 }
