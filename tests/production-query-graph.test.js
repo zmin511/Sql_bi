@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { loadProductionRuntime } from "./helpers/load-production-runtime.js";
 const tests=[];const test=(name,fn)=>tests.push({name,fn});
 const rows=[{id:"doc",internal:"_Document1",object:"Doc",parentId:null},{id:"field",internal:"_Fld1",object:"Value",type:"string",parentId:"doc"}];
-function runtime(){const value=loadProductionRuntime();value.api.importRows(rows.map(row=>({...row})));value.api.state.selected={field:true};value.api.renderSQL();return value;}
+function runtime(){const value=loadProductionRuntime();value.api.importRows(rows.map(row=>({...row})));value.api.state.selected={field:true};value.api.state.queryGraphScope="all";value.api.renderSQL();return value;}
 test("graph panel exists",()=>assert.match(runtime().html,/id="queryGraphPanel"/));
 test("graph mode exists",()=>assert.match(runtime().html,/id="structureViewMode"/));
 test("graph filter exists",()=>assert.match(runtime().html,/id="queryGraphFilter"/));

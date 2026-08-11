@@ -468,6 +468,7 @@ async function runBrowserWorkflow() {
   const emptyAfterEscape = await evaluate(client, semanticExpression);
   test("Escape before fixture load is safe", () => assert.deepEqual(emptyAfterEscape, emptySemantic));
 
+  await select(client, "queryGraphScope", "all");
   const small = smallSnapshot();
   await characterize("small project load + initial render", () => loadProjectAndWait(client, small, { nodes: 7 }), TIMEOUTS.fixture);
   const baseline = await evaluate(client, semanticExpression);
@@ -577,6 +578,18 @@ async function runBrowserWorkflow() {
   test("large edge Escape resets focus, details, and dimming without semantic changes", () => { assert.deepEqual({focus:largeEdgeAfterEscape.focus,dimmed:largeEdgeAfterEscape.dimmed,details:largeEdgeAfterEscape.details}, {focus:0,dimmed:0,details:""}); assert.equal(largeEdgeAfterEscape.semantic.focus, null); assert.deepEqual(largeEdgeAfterEscape.semantic, largeBaseline); });
   test("large graph final identical state has stable DOM", () => assert.deepEqual(finalLargeCounts, { nodes: largeCounts.nodes, edges: largeCounts.edges, dom: largeCounts.dom, duplicates: 0 }));
   test("large graph has no global horizontal overflow", () => assert.equal(largeCounts.overflow, false));
+  await select(client, "queryGraphScope", "query");
+  await characterize("query-plan graph load", () => loadProjectAndWait(client, large, { nodes: 3, edges: 2 }), TIMEOUTS.fixture);
+  const queryGraph = await evaluate(client, `({scope:document.getElementById("queryGraphScope").value,nodes:Array.from(document.querySelectorAll("#queryGraphNodes [data-node-id]")).map(node=>({id:node.dataset.nodeId,text:node.textContent})),edges:Array.from(document.querySelectorAll("#queryGraphNodes [data-edge-id]")).map(edge=>({id:edge.dataset.edgeId,text:edge.textContent})),details:document.getElementById("queryGraphDetails").textContent,empty:document.getElementById("queryGraphEmpty").textContent})`);
+  await pointerClick(client, '#queryGraphNodes [data-node-id="alias:R1"]');
+  const queryNodeDetails = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
+  await pointerClick(client, '#queryGraphNodes [data-edge-id^="join:header_detail:"]');
+  const queryEdgeDetails = await evaluate(client, "document.getElementById('queryGraphDetails').textContent");
+  test("query scope is the explicit default query-plan mode", () => assert.equal(queryGraph.scope, "query"));
+  test("query graph exposes only canonical H T R1 alias participants", () => { assert.deepEqual(queryGraph.nodes.map(node=>node.id), ["alias:H","alias:T","alias:R1"]); assert.ok(queryGraph.nodes.every(node=>!node.id.startsWith("row:"))); });
+  test("query graph exposes canonical header/detail and reference SQL edges", () => { assert.equal(queryGraph.edges.length, 2); assert.ok(queryGraph.edges.some(edge=>edge.text.includes("_Document100_IDRRef"))); assert.ok(queryGraph.edges.some(edge=>edge.text.includes("_Fld100011RRef"))); });
+  test("reference alias node focus exposes projected field details", () => assert.match(queryNodeDetails, /R1|_Description/));
+  test("query edge focus exposes physical join details", () => assert.match(queryEdgeDetails, /_Document100_IDRRef|header_detail/));
   console.log("Browser performance characterization (in-page elapsed includes production event/render; round-trip includes CDP):");
   console.table(performanceRows);
   const unhandledRejections = await evaluate(client, "window.__SQLBI_BROWSER_TEST__.unhandledRejections()");

@@ -12,7 +12,7 @@ const rows = () => [
   { id: "employees", object: "Сотрудники", title: "Справочник.Сотрудники", internal: "_Reference10", parentId: null, metadata: "Справочник.Сотрудники" },
   { id: "employeeName", object: "Name", title: "Name", internal: "_Description", type: "string", parentId: "employees" }
 ];
-function runtime() { const value = loadProductionRuntime("index.html"); value.api.importRows(rows().map(row => ({ ...row }))); return value; }
+function runtime() { const value = loadProductionRuntime("index.html"); value.api.importRows(rows().map(row => ({ ...row }))); value.api.state.queryGraphScope = "all"; return value; }
 function render(value) { value.api.renderTree(); value.api.renderSQL(); return value; }
 function select(value, id) { value.api.state.selected[id] = true; return render(value); }
 
