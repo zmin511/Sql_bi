@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { VERSION_RE, assertStaticReleaseContracts, assertVersion, withCandidate } from "../scripts/preflight-utils.mjs";
+import { VERSION_RE, assertProductionExportVersion, assertStaticReleaseContracts, assertVersion, withCandidate } from "../scripts/preflight-utils.mjs";
 const root = process.cwd(); const dev = fs.readFileSync("scripts/check-local-development.mjs", "utf8"); const release = fs.readFileSync("scripts/check-local-release.mjs", "utf8");
 const test = (name, fn) => { fn(); console.log(`ok - ${name}`); };
 test("preflight scripts exist and parse", () => { assert.ok(fs.existsSync("scripts/check-local-development.mjs")); assert.ok(fs.existsSync("scripts/check-local-release.mjs")); execFileSync(process.execPath,["--check","scripts/check-local-development.mjs"]); execFileSync(process.execPath,["--check","scripts/check-local-release.mjs"]); });
@@ -13,6 +13,7 @@ test("missing and invalid versions fail closed", () => { assert.throws(() => ass
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "sql-bi-preflight-fixture-"));
 try { for (const file of ["VERSION", "package.json", "index.html", "CHANGELOG.md"]) fs.copyFileSync(path.join(root,file),path.join(temp,file));
   test("version mismatch fails closed", () => assert.throws(() => assertVersion(temp, "0.2.4")));
+  test("stale production export version fails closed", () => { fs.writeFileSync(path.join(temp,"index.html"), fs.readFileSync(path.join(temp,"index.html"),"utf8").replace('const APP_VERSION = "0.2.3";', 'const APP_VERSION = "0.2.2";')); assert.throws(() => assertProductionExportVersion(temp, "0.2.3"), /APP_VERSION/); });
   test("stale runtime and public API fail closed", () => { fs.appendFileSync(path.join(temp,"index.html"), "\nwindow.__SQLBI_TEST__ = {};\n"); assert.throws(() => assertStaticReleaseContracts(temp)); });
 } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 

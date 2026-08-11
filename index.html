@@ -2802,7 +2802,7 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
     const escapeHtml = (s)=> String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
     const HL = (text,q)=> !q?escapeHtml(text):escapeHtml(text).replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"ig"),m=>'<span class="hl">'+m+'</span>');
 
-    const APP_VERSION = "0.2.2";
+    const APP_VERSION = "0.2.3";
     function requireCanonicalProjectApi(){
       const core=window.SQLBICanonicalCore;
       if(!core || typeof core.parseProjectSnapshot!=="function" || typeof core.createProjectSnapshot!=="function" || typeof core.normalizeVisualizationSettings!=="function"){

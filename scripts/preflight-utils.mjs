@@ -23,6 +23,12 @@ export function assertVersion(root, expected) {
   const changelog = path.join(root, "CHANGELOG.md");
   if (fs.existsSync(changelog) && !fs.readFileSync(changelog, "utf8").match(new RegExp(`^## ${expected.replaceAll(".", "\\.")}\\b`, "m"))) fail("latest changelog version does not match expected version");
 }
+export function assertProductionExportVersion(root, expected) {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const escapedVersion = expected.replaceAll(".", "\\.");
+  if (!new RegExp(`\\bconst\\s+APP_VERSION\\s*=\\s*["']${escapedVersion}["']\\s*;`).test(html)) fail("production APP_VERSION does not match expected version");
+  if (!/createProjectSnapshot\s*\(\s*state\s*,\s*APP_VERSION\s*\)/.test(html)) fail("production save path does not use APP_VERSION");
+}
 export function assertStaticReleaseContracts(root) {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   if (/window\.__SQLBI_TEST__\s*=/.test(html)) fail("raw HTML exposes public test API");
