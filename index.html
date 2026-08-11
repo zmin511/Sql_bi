@@ -4323,7 +4323,9 @@ window.SQLBICanonicalCore = { buildQueryPlan, buildQueryPlanView, generateSql, n
       $("queryGraphEdgeCount").textContent = `Связей: ${visibleEdges.length}`;
       const reset = $("queryGraphResetFocus");
       if(reset) reset.style.display = focusedId ? "inline-block" : "none";
-      if(!model.edges.length && !model.nodes.length){ $("queryGraphEmpty").textContent = "Структура не загружена или не содержит связей."; }
+      if(state.queryGraphScope==="query" && model.status==="empty"){ $("queryGraphEmpty").textContent = "Выберите поля для запроса — здесь появятся таблицы и связи текущего SQL."; }
+      else if(state.queryGraphScope==="query" && model.status==="blocked"){ $("queryGraphEmpty").textContent = `Запрос не может быть построен: ${model.reason||"unknown"}. ${(model.diagnostics||[]).join(" ")}`.trim(); }
+      else if(!model.edges.length && !model.nodes.length){ $("queryGraphEmpty").textContent = "Структура не загружена или не содержит связей."; }
       else if(!visibleEdges.length){ $("queryGraphEmpty").textContent = "Выбранный фильтр не нашёл связей."; }
       else { $("queryGraphEmpty").textContent = ""; }
       $("queryGraphSvg").innerHTML = visibleEdges.map((edge, index) => `<line data-edge-id="${escapeHtml(edge.id)}" x1="0" y1="${12 + index * 12}" x2="100" y2="${12 + index * 12}" stroke="${edge.status === "sql" ? "#2563eb" : "#b45309"}"/>`).join("");

@@ -31,6 +31,7 @@ const instrumentation = `    window.__SQLBI_IMPORT_BROWSER_TEST__ = Object.freez
         queryPlan: state.queryPlan, sql: state.queryResult && state.queryResult.sql || "", graphView: state.queryGraph
       })
     });
+    document.getElementById("xlsx").addEventListener("change", () => setTimeout(() => document.getElementById("btn-expand").click(), 0));
 `;
 const sourceHtml = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 if (sourceHtml.split(instrumentationAnchor).length - 1 !== 1) throw new Error("Expected one production instrumentation anchor.");
@@ -119,6 +120,7 @@ try {
     const alertsBefore = window.__local13bAlerts.length; let reads = 0;
     Object.defineProperty(input, "files", { configurable: true, value: [{ name: "zero-semantic-id-browser.xlsx", arrayBuffer() { reads += 1; return Promise.resolve(bytes); } }] });
     input.dispatchEvent(new Event("change", { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 100));
+    document.getElementById("btn-expand").click();
     return { parsedRootId: parsed[0].id, parsedChildParent: parsed[1].parent, reads, alertsBefore, after: { inputValue: input.value, bodyText: document.body.innerText, semantic: window.__SQLBI_IMPORT_BROWSER_TEST__.semantic(), alerts: window.__local13bAlerts.slice(), rejections: window.__local13bRejections.slice() } };
   })()`);
   assert.strictEqual(zeroIdImport.parsedRootId, 0, "Browser workbook must preserve explicit numeric root ID zero.");
