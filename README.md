@@ -267,7 +267,7 @@ No installation is required. The application is a single HTML file.
 
 ## Current Version
 
-Development version: `0.2.2`. Latest stable release: `0.2.0`.
+Development version: `0.2.4`. Latest stable release: `0.2.0`.
 
 The release is a self-contained portable HTML file: SheetJS is embedded, and no internet connection is required.
 

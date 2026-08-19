@@ -1,4 +1,12 @@
 # Changelog
+## 0.2.4 - 2026-08-19
+
+### Promedica Light UI
+- Production `index.html` moved to the Promedica light corporate design system: central colour, surface, radius, focus and motion tokens.
+- Added textual product identity for Promedica SQL BI without inventing a logo asset.
+- Restyled cards, forms, actions, tree metadata, relationship graph and SQL workspace while preserving the existing DOM contracts and canonical runtime.
+- Added responsive mobile treatment, visible keyboard focus and reduced-motion handling.
+
 ## 0.2.3 - 2026-08-11
 
 ### Added and changed

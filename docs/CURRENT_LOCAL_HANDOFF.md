@@ -4,7 +4,7 @@
 
 SQL BI is a portable, local-first browser application for importing 1C metadata structures, selecting physical and synthetic fields, generating SQL through a canonical query plan, inspecting relationships and projected fields, and saving/loading project snapshots.
 
-The published version remains `0.2.2`. Local development after that release is intentionally unpublished.
+The current published development-branch version is `0.2.4`. The immutable `v0.2.2` tag remains the last formal stable release artifact.
 
 ## 2. Working directory
 
@@ -30,21 +30,19 @@ Branch:
 local/next-development
 ```
 
-HEAD before the LOCAL09 documentation commit:
+HEAD before the Promedica Light UI milestone:
 
 ```text
-abe96539bfb7763ebbb0f4726768fad591850d97
+d37d702a8151c15fa717009b0f437cbd2cdc568a
 ```
 
 Commit:
 
 ```text
-Consolidate project persistence in canonical core
+LOCAL25B: harden graph-assisted workflow coverage
 ```
 
-The LOCAL09 documentation commit is expected to be the direct child of this commit.
-
-The branch has no upstream.
+The branch tracks `origin/local/next-development`.
 
 ## 4. Remote state
 
@@ -59,9 +57,9 @@ Do not fetch or push without a separate explicit decision.
 
 ## 5. Published release history
 
-The published release is `v0.2.2`. Its tag identifies a stale published artifact and is immutable: do not move, recreate, or delete it.
+The immutable `v0.2.2` tag identifies the last formal stable artifact: do not move, recreate, or delete it.
 
-The local branch contains later repairs and development commits that have not been published. The application version remains `0.2.2`; no new release has been created.
+Version `0.2.4` is the Promedica Light UI milestone on the published development branch. It is not a GitHub Release or tag.
 
 ## 6. Local-first workflow
 
@@ -154,7 +152,7 @@ Projected-fields inspection renders `plan.selections` directly. Production does 
 
 ## 13. Production UI
 
-The UI supports structure import, tree/reference navigation, selections and filters, canonical SQL generation, relationship graph presentation, projected-fields inspection, project save/load, and Power Query export.
+The UI supports structure import, tree/reference navigation, selections and filters, canonical SQL generation, relationship graph presentation, projected-fields inspection, project save/load, and Power Query export. Its presentation uses the Promedica Light corporate token set, text-only product identity, accessible focus states, reduced-motion support and responsive card layout.
 
 Production state stores canonical `queryPlan` and `queryResult` only as derived runtime state. Project load applies canonical normalized state and refreshes the DOM. Recovery messages format canonical diagnostics.
 
